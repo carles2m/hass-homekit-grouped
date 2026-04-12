@@ -2,6 +2,10 @@
 
 Runs a pyhap AccessoryDriver inside HA's event loop, on a dedicated port,
 with persistent pairing state stored in the HA config directory.
+
+Uses HA's shared Zeroconf instance. All pyhap setup that does synchronous
+filesystem I/O (resource loads, pairing state read) runs in an executor
+so the event loop stays responsive during startup.
 """
 
 from __future__ import annotations
@@ -10,6 +14,7 @@ import logging
 import os
 from typing import Any
 
+from homeassistant.components.zeroconf import async_get_instance
 from homeassistant.core import HomeAssistant
 from pyhap.accessory import Bridge
 from pyhap.accessory_driver import AccessoryDriver
@@ -42,29 +47,26 @@ class GroupedBridge:
     def _state_path(self) -> str:
         return os.path.join(self.hass.config.path(), PAIRING_FILE)
 
-    async def async_start(self) -> None:
-        """Start the pyhap bridge. Must be called after HA is fully started."""
-        _LOGGER.info(
-            "Starting HomeKit grouped bridge %r on port %d with %d devices",
-            self.name,
-            self.port,
-            len(self.device_configs),
-        )
+    def _build_driver_and_bridge(self, zeroconf) -> AccessoryDriver:
+        """Construct the AccessoryDriver, build the Bridge, attach accessories.
 
-        # AccessoryDriver runs its own asyncio tasks on the current loop.
-        self._driver = AccessoryDriver(
+        Runs fully in an executor because pyhap's init reads JSON resource
+        files and pairing state synchronously.
+        """
+        driver = AccessoryDriver(
             port=self.port,
             persist_file=self._state_path,
             loop=self.hass.loop,
+            async_zeroconf_instance=zeroconf,
         )
 
-        bridge = Bridge(self._driver, self.name)
+        bridge = Bridge(driver, self.name)
         bridge.category = CATEGORY_OTHER
 
         for cfg in self.device_configs:
             profile_cls = get_profile(cfg[CONF_PROFILE])
             accessory = profile_cls(
-                driver=self._driver,
+                driver=driver,
                 hass=self.hass,
                 name=cfg[CONF_NAME],
                 device_id=cfg[CONF_DEVICE_ID],
@@ -78,23 +80,34 @@ class GroupedBridge:
                 cfg[CONF_DEVICE_ID],
             )
 
-        self._driver.add_accessory(accessory=bridge)
+        driver.add_accessory(accessory=bridge)
+        return driver
 
-        # Start listening on HA state changes BEFORE driver starts so we don't
-        # miss early transitions.
+    async def async_start(self) -> None:
+        """Start the pyhap bridge. Must be called after HA is fully started."""
+        _LOGGER.info(
+            "Starting HomeKit grouped bridge %r on port %d with %d devices",
+            self.name,
+            self.port,
+            len(self.device_configs),
+        )
+
+        zeroconf = await async_get_instance(self.hass)
+        self._driver = await self.hass.async_add_executor_job(
+            self._build_driver_and_bridge, zeroconf
+        )
+
         for accessory in self._accessories:
             await accessory.async_wire_state_listeners()
 
-        # Log the pairing QR and PIN for the user on first boot.
         pin = self._driver.state.pincode.decode()
         _LOGGER.warning(
             "HomeKit Grouped Bridge ready. Add to Apple Home with PIN %s "
-            "(setup URI: %s)",
+            "(setup id: %s)",
             pin,
             self._driver.state.setup_id,
         )
 
-        # start() is blocking in sync land; pyhap provides async_start().
         await self._driver.async_start()
 
     async def async_stop(self) -> None:
