@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from abc import abstractmethod
 from typing import Iterable
@@ -12,6 +13,20 @@ from pyhap.accessory import Accessory
 from pyhap.const import CATEGORY_OTHER
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _stable_aid(device_id: str) -> int:
+    """Derive a HomeKit AID from a device_id that is stable across HA
+    restarts. Python's built-in hash() is randomized per process, so using
+    it for AID means Apple Home sees a new accessory after every restart
+    and forgets room/type/notification customizations.
+
+    HomeKit AIDs are 1..2^32-1. AID 1 is reserved for the bridge itself;
+    we keep accessories in 2..2^31-1 to avoid signed-int surprises.
+    """
+    digest = hashlib.sha256(device_id.encode("utf-8")).digest()
+    aid = int.from_bytes(digest[:4], "big") & 0x7FFFFFFF
+    return aid if aid > 1 else 2
 
 
 class GroupedAccessory(Accessory):
@@ -28,8 +43,10 @@ class GroupedAccessory(Accessory):
         device_id: str,
         overrides: dict | None = None,
     ) -> None:
-        # AID is derived from device_id hash so it's stable across restarts.
-        aid = (hash(device_id) & 0x7FFFFFFF) or 1
+        # AID derived from a stable SHA-256 of device_id so Apple Home's
+        # per-accessory customizations (room, type, notifications) survive
+        # HA restarts.
+        aid = _stable_aid(device_id)
         super().__init__(driver=driver, display_name=name, aid=aid)
         self.hass = hass
         self.device_id = device_id
