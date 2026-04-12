@@ -14,10 +14,14 @@ accessory with multiple services, so Apple Home shows one tile.
 
 Alpha. Use at your own risk. Tested with a specific setup; YMMV.
 
-## Supported devices (v0.1)
+## Supported devices
 
-- **LG ThinQ washer** — exposed as Valve (active while running) + OccupancySensor (cycle in progress) + Switch (power)
-- **LG ThinQ dryer** — same shape as washer
+- **LG ThinQ washer / dryer** (`thinq_washer` profile) — Valve with countdown +
+  MotionSensor for cycle-complete notification, triggered by the ThinQ
+  integration's `event.*_notification` entity
+- **Home Connect fridge-freezer** (`home_connect_fridge` profile) — 2 Contact
+  Sensors (doors) + 3 Motion Sensors (door-left-open alarms, over-temperature
+  alarm) + 2 Temperature Sensors (setpoints)
 
 More profiles to come. PRs welcome (but don't expect fast merges).
 
@@ -27,6 +31,8 @@ More profiles to come. PRs welcome (but don't expect fast merges).
 - You pair it in Apple Home separately from HA's built-in HomeKit bridge
 - Exclude the grouped devices' entities from HA's built-in HomeKit bridge to avoid duplicates
 - State sync: subscribes to HA state changes, pushes to HAP characteristics
+- Accessory AIDs are derived from a stable SHA-256 of the HA device_id, so Apple
+  Home customizations (room, type, notifications) survive HA restarts
 
 ## Install
 
@@ -34,7 +40,8 @@ More profiles to come. PRs welcome (but don't expect fast merges).
 2. Install, restart HA
 3. Add config to `configuration.yaml` (see below)
 4. Restart HA
-5. In Apple Home, add accessory, scan the QR shown in HA logs
+5. In Apple Home, add accessory, scan the QR shown in HA logs (PIN is in the HA log line
+   starting with `HomeKit Grouped Bridge ready`)
 
 ## Configuration
 
@@ -43,32 +50,65 @@ homekit_grouped:
   bridge:
     port: 21065
     name: "HA Grouped Bridge"
+
   devices:
+    # LG ThinQ washer
     - profile: thinq_washer
       device_id: <ha_device_id_of_washer>
       name: "Washer"
-      category: faucet           # sprinkler | faucet | fan | other | shower_head
-      valve_type: faucet         # generic | irrigation | shower | faucet
-      finishing_states:          # cycle states that fire the "Finishing" sensor
-        - spinning
-        - drying
-    - profile: thinq_washer      # dryer uses same profile with different config
+      category: faucet            # sprinkler | faucet | fan | other | shower_head
+      valve_type: faucet          # generic | irrigation | shower | faucet
+      finished_event_types:       # event_type values from event.*_notification
+        - washing_is_complete     # that fire the "Finished" MotionSensor pulse
+
+    # LG ThinQ dryer (same profile, different config)
+    - profile: thinq_washer
       device_id: <ha_device_id_of_dryer>
       name: "Dryer"
-      category: fan
-      valve_type: irrigation     # irrigation gives the cleanest countdown UI
-      finishing_states:
-        - cooling
-        - wrinkle_care
+      category: fan               # gives the fan tile icon in Apple Home
+      valve_type: irrigation      # irrigation renders the cleanest countdown UI
+      finished_event_types:
+        - drying_is_complete
+
+    # Home Connect fridge-freezer
+    - profile: home_connect_fridge
+      device_id: <ha_device_id_of_fridge>
+      name: "Fridge"
+      category: other             # other | sensor | door | window
 ```
 
-`category` affects the tile icon in Apple Home. `valve_type` determines whether
-the valve shows as a generic valve, irrigation (sprinkler-style countdown),
-shower, or water faucet. `finishing_states` must be set explicitly per device —
-meaningful late-cycle phases differ wildly by appliance.
+### Per-device options
 
-Remember to also remove those devices' entities from HA's built-in HomeKit bridge filter
-to avoid seeing them twice in Apple Home.
+- **`category`** — affects the Apple Home tile icon. Valid across profiles:
+  `sprinkler`, `faucet`, `fan`, `other`, `shower_head`, `door`, `sensor`, `window`.
+  Not every profile supports every category; check profile source if unsure.
+- **`valve_type`** (thinq_washer only) — `generic`, `irrigation`, `shower`, or
+  `faucet`. Determines valve semantics in Apple Home. `irrigation` produces
+  the cleanest "X min remaining" countdown.
+- **`finished_event_types`** (thinq_washer only) — list of `event_type` values
+  emitted on the device's `event.*_notification` entity that should fire the
+  "Finished" MotionSensor pulse (one-shot iOS notification per cycle end).
+  No default — must be set per device since event names vary by appliance.
+
+### Remember to remove entities from HA's built-in HomeKit bridge
+
+Once a device is exposed here, remove its entities from HA HomeKit's
+`include_entities` filter (Settings → Devices & Services → HomeKit Bridge →
+Configure) so you don't see the same accessory twice in Apple Home.
+
+### Tip: change the parent tile icon via "Display As"
+
+For multi-service accessories (like the fridge), Apple Home picks the tile
+icon based on the primary service type, not the HAP category. To change
+how the parent tile looks:
+
+1. Open the grouped accessory in Apple Home (e.g. Fridge)
+2. Long-press a sub-accessory (e.g. Fridge Refrigerator Door) → Settings
+3. Change **Display As** from "Contact Sensor" to "Door" (or Window, etc.)
+4. The parent tile's icon updates to match
+
+This works across restarts because AIDs/IIDs are stable. Do it once per
+device.
 
 ## License
 

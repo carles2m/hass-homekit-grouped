@@ -33,7 +33,12 @@ from typing import Iterable
 
 from homeassistant.core import State
 from homeassistant.helpers import entity_registry as er
-from pyhap.const import CATEGORY_OTHER, CATEGORY_SENSOR
+from pyhap.const import (
+    CATEGORY_DOOR,
+    CATEGORY_OTHER,
+    CATEGORY_SENSOR,
+    CATEGORY_WINDOW,
+)
 
 from .base import GroupedAccessory
 
@@ -55,6 +60,8 @@ _CHAR_CONFIGURED_NAME = "ConfiguredName"
 _CATEGORY_MAP = {
     "other": CATEGORY_OTHER,
     "sensor": CATEGORY_SENSOR,
+    "door": CATEGORY_DOOR,
+    "window": CATEGORY_WINDOW,
 }
 _DEFAULT_CATEGORY_NAME = "other"
 

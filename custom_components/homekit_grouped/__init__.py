@@ -49,7 +49,16 @@ from .profiles import PROFILES
 
 _LOGGER = logging.getLogger(__name__)
 
-_CATEGORY_VALUES = ["sprinkler", "faucet", "fan", "other", "shower_head"]
+_CATEGORY_VALUES = [
+    "sprinkler",
+    "faucet",
+    "fan",
+    "other",
+    "shower_head",
+    "door",
+    "sensor",
+    "window",
+]
 _VALVE_TYPE_VALUES = ["generic", "irrigation", "shower", "faucet"]
 
 _DEVICE_SCHEMA = vol.Schema(
