@@ -75,6 +75,7 @@ homekit_grouped:
       device_id: <ha_device_id_of_fridge>
       name: "Fridge"
       category: other             # other | sensor | door | window
+      tile_service: garage_door   # (optional) see "room tiles" below
 ```
 
 ### Per-device options
@@ -89,6 +90,9 @@ homekit_grouped:
   emitted on the device's `event.*_notification` entity that should fire the
   "Finished" MotionSensor pulse (one-shot iOS notification per cycle end).
   No default — must be set per device since event names vary by appliance.
+- **`tile_service`** (home_connect_fridge only) — optional `garage_door`.
+  Adds a fake actionable service so Apple Home shows the accessory as a
+  room tile. See "Getting a room tile" below.
 
 ### Remember to remove entities from HA's built-in HomeKit bridge
 
@@ -109,6 +113,42 @@ how the parent tile looks:
 
 This works across restarts because AIDs/IIDs are stable. Do it once per
 device.
+
+### Getting a room tile for a sensor-only accessory (`tile_service`)
+
+Apple Home only shows tiles in room views for accessories with at least
+one "actionable" service (lights, switches, valves, locks, fans, garage
+doors, thermostats). Pure-sensor accessories — like the Home Connect
+fridge, which is just contact sensors, motion sensors, and temperature
+sensors — live in the accessory list but never get a room tile.
+
+The `tile_service` option adds a fake actionable service to the
+accessory so Apple Home gives it a room tile. Currently supported on
+`home_connect_fridge`:
+
+- `garage_door` — adds a HAP `GarageDoorOpener` service driven by the
+  refrigerator door's open/closed state. The fridge appears as a
+  door-style tile in its room. Writes are silently reverted — you
+  can't actually command the fridge open/closed from HomeKit.
+
+The service is appended LAST to the accessory's service list so it
+doesn't shift IIDs of existing services. Your Display As overrides,
+room assignments, and notification preferences on the other sensors
+are preserved.
+
+**Heads up on notifications.** iOS treats GarageDoorOpener as a
+safety-relevant device type and enables status-change notifications
+on it by default — meaning you'll get a push every time the fridge
+door opens or closes. To silence:
+
+1. In the Home app, long-press the fridge's garage-door tile
+2. Settings → Notifications → **turn off status-change notifications**
+3. (Repeat on every family member's iPhone — notification prefs are
+   per-device, not shared via iCloud)
+
+If you don't want room-tile visibility badly enough to manage this
+per-phone, leave `tile_service` unset and use the Display As workaround
+(above) instead.
 
 ## License
 

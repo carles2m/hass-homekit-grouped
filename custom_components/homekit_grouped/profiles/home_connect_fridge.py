@@ -50,12 +50,21 @@ _ALARM_ACTIVE = frozenset({"present", "confirmed"})
 _SERV_CONTACT = "ContactSensor"
 _SERV_MOTION = "MotionSensor"
 _SERV_TEMPERATURE = "TemperatureSensor"
+_SERV_GARAGE = "GarageDoorOpener"
 
 _CHAR_CONTACT_STATE = "ContactSensorState"
 _CHAR_MOTION_DETECTED = "MotionDetected"
 _CHAR_CURRENT_TEMPERATURE = "CurrentTemperature"
+_CHAR_CURRENT_DOOR_STATE = "CurrentDoorState"
+_CHAR_TARGET_DOOR_STATE = "TargetDoorState"
+_CHAR_OBSTRUCTION_DETECTED = "ObstructionDetected"
 _CHAR_NAME = "Name"
 _CHAR_CONFIGURED_NAME = "ConfiguredName"
+
+# GarageDoorOpener door state enum:
+#   0 = Open, 1 = Closed, 2 = Opening, 3 = Closing, 4 = Stopped
+_DOOR_STATE_OPEN = 0
+_DOOR_STATE_CLOSED = 1
 
 _CATEGORY_MAP = {
     "other": CATEGORY_OTHER,
@@ -115,6 +124,65 @@ class HomeConnectFridgeAccessory(GroupedAccessory):
         self._char_freezer_temp = self._add_temperature(
             f"{self.display_name} Freezer Temperature"
         )
+
+        # --- Optional tile-producing service (appended LAST so existing
+        # service IIDs don't shift — preserves Apple Home customizations).
+        # Apple Home hides pure-sensor accessories from room tile views.
+        # Adding an actionable service here makes the accessory eligible
+        # for a room tile. Opt-in via `tile_service` YAML config.
+        self._char_garage_current = None
+        self._char_garage_target = None
+        tile_service = self.overrides.get("tile_service")
+        if tile_service == "garage_door":
+            self._add_garage_door(self.display_name)
+
+    def _add_garage_door(self, name: str) -> None:
+        """GarageDoorOpener service driven by the refrigerator door's
+        open/closed state. TargetDoorState writes are reverted — the
+        fridge can't actually be commanded open/closed from HomeKit."""
+        serv = self.add_preload_service(
+            _SERV_GARAGE,
+            [
+                _CHAR_CURRENT_DOOR_STATE,
+                _CHAR_TARGET_DOOR_STATE,
+                _CHAR_OBSTRUCTION_DETECTED,
+                _CHAR_NAME,
+                _CHAR_CONFIGURED_NAME,
+            ],
+        )
+        self._char_garage_current = serv.configure_char(
+            _CHAR_CURRENT_DOOR_STATE, value=_DOOR_STATE_CLOSED
+        )
+        self._char_garage_target = serv.configure_char(
+            _CHAR_TARGET_DOOR_STATE, value=_DOOR_STATE_CLOSED
+        )
+        self._char_garage_target.setter_callback = self._revert_garage_target
+        serv.configure_char(_CHAR_OBSTRUCTION_DETECTED, value=False)
+        serv.configure_char(_CHAR_NAME, value=name)
+        serv.configure_char(_CHAR_CONFIGURED_NAME, value=name)
+
+    def _revert_garage_target(self, _requested_value: int) -> None:
+        """Ignore client writes to TargetDoorState; snap back to the real
+        refrigerator-door state."""
+        if (
+            self._refrigerator_door_entity is None
+            or self._char_garage_target is None
+        ):
+            return
+        real = self.hass.states.get(self._refrigerator_door_entity)
+        if real is None:
+            return
+        self._push_garage_door(real.state)
+
+    def _push_garage_door(self, source_state: str) -> None:
+        if self._char_garage_current is None or self._char_garage_target is None:
+            return
+        if source_state == "on":
+            self._char_garage_current.set_value(_DOOR_STATE_OPEN)
+            self._char_garage_target.set_value(_DOOR_STATE_OPEN)
+        else:
+            self._char_garage_current.set_value(_DOOR_STATE_CLOSED)
+            self._char_garage_target.set_value(_DOOR_STATE_CLOSED)
 
     def _add_contact(self, name: str):
         serv = self.add_preload_service(
@@ -209,6 +277,7 @@ class HomeConnectFridgeAccessory(GroupedAccessory):
             self._char_refrigerator_door.set_value(
                 self._contact_value(state.state)
             )
+            self._push_garage_door(state.state)
         elif entity_id == self._freezer_door_entity:
             self._char_freezer_door.set_value(self._contact_value(state.state))
         elif entity_id == self._refrigerator_alarm_entity:

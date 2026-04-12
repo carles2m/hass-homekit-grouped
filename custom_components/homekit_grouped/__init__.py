@@ -40,6 +40,7 @@ from .const import (
     CONF_FINISHED_EVENT_TYPES,
     CONF_NAME,
     CONF_PROFILE,
+    CONF_TILE_SERVICE,
     CONF_VALVE_TYPE,
     DEFAULT_BRIDGE_NAME,
     DEFAULT_PORT,
@@ -71,6 +72,7 @@ _DEVICE_SCHEMA = vol.Schema(
         vol.Optional(CONF_FINISHED_EVENT_TYPES): vol.All(
             cv.ensure_list, [cv.string]
         ),
+        vol.Optional(CONF_TILE_SERVICE): vol.In(["fan", "garage_door"]),
     }
 )
 

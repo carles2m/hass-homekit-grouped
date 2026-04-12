@@ -12,6 +12,7 @@ CONF_NAME = "name"
 CONF_CATEGORY = "category"
 CONF_VALVE_TYPE = "valve_type"
 CONF_FINISHED_EVENT_TYPES = "finished_event_types"
+CONF_TILE_SERVICE = "tile_service"
 
 DEFAULT_PORT = 21065
 DEFAULT_BRIDGE_NAME = "HA Grouped Bridge"

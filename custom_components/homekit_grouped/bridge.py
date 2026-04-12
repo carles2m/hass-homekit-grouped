@@ -26,6 +26,7 @@ from .const import (
     CONF_FINISHED_EVENT_TYPES,
     CONF_NAME,
     CONF_PROFILE,
+    CONF_TILE_SERVICE,
     CONF_VALVE_TYPE,
     PAIRING_FILE,
 )
@@ -82,6 +83,7 @@ class GroupedBridge:
                     "category": cfg.get(CONF_CATEGORY),
                     "valve_type": cfg.get(CONF_VALVE_TYPE),
                     "finished_event_types": cfg.get(CONF_FINISHED_EVENT_TYPES),
+                    "tile_service": cfg.get(CONF_TILE_SERVICE),
                 },
             )
             bridge.add_accessory(accessory)
