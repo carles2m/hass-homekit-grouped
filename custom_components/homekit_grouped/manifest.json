@@ -1,0 +1,11 @@
+{
+  "domain": "homekit_grouped",
+  "name": "HomeKit Grouped",
+  "documentation": "https://github.com/carles2m/hass-homekit-grouped",
+  "issue_tracker": "https://github.com/carles2m/hass-homekit-grouped/issues",
+  "codeowners": ["@carles2m"],
+  "dependencies": ["homekit"],
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "0.1.0"
+}
