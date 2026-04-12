@@ -1,13 +1,20 @@
 """ThinQ washer/dryer profile.
 
-Read-only grouped accessory with two services:
-  - Valve (Irrigation style) — Active+InUse reflect whether a cycle is
-    running; SetDuration = total cycle time; RemainingDuration = time left.
-    Active is marked read-only so Apple Home shows a status indicator, not
-    an on/off toggle.
-  - MotionSensor — fires briefly when the cycle transitions from running
-    to not-running. Apple Home's "Activity Notifications" on this sensor
-    produce a one-shot iOS notification when the cycle completes.
+Read-only grouped accessory with services:
+  - (Optional, if category=fan) Fanv2 — primary service so Apple Home uses
+    the fan tile icon. Active reflects whether a cycle is running.
+  - Valve (Irrigation/Faucet/etc. per YAML) — carries the countdown.
+    Active+InUse reflect running; SetDuration = total cycle time from
+    the ThinQ total_time sensor; RemainingDuration = seconds until the
+    cycle finishes, derived from the ThinQ remaining_time timestamp.
+  - MotionSensor "Finished" — fires a 60s motion pulse when the ThinQ
+    integration emits a configured event_type on the device's
+    event.*_notification entity (e.g. washing_is_complete). Apple Home
+    notifies once per detected motion, giving a single iOS push per
+    cycle.
+
+Nothing in HomeKit is actually user-controllable: Apple Home may render
+the Valve as a toggle, but any write is reverted to the real state.
 """
 
 from __future__ import annotations
@@ -47,23 +54,16 @@ _RUNNING_STATES = frozenset(
     }
 )
 
-# "Finishing states" are per-device configurable via YAML. There is no
-# default because the meaningful late-cycle phases differ wildly by
-# appliance: dryers have cooling / wrinkle_care, washers might use
-# spinning / drying, combo units have their own progression. The user
-# picks which states should surface as "Finishing" for each device.
-
 _SERV_VALVE = "Valve"
 _SERV_MOTION = "MotionSensor"
-_SERV_OCCUPANCY = "OccupancySensor"
 _SERV_FAN = "Fanv2"
+
 _CHAR_ACTIVE = "Active"
 _CHAR_IN_USE = "InUse"
 _CHAR_VALVE_TYPE = "ValveType"
 _CHAR_REMAINING_DURATION = "RemainingDuration"
 _CHAR_SET_DURATION = "SetDuration"
 _CHAR_MOTION_DETECTED = "MotionDetected"
-_CHAR_OCCUPANCY_DETECTED = "OccupancyDetected"
 _CHAR_NAME = "Name"
 _CHAR_CONFIGURED_NAME = "ConfiguredName"
 
@@ -82,15 +82,11 @@ _VALVE_TYPE_MAP = {
 }
 _DEFAULT_CATEGORY_NAME = "sprinkler"
 _DEFAULT_VALVE_TYPE_NAME = "irrigation"
-_DURATION_MAX = 3600  # HAP cap
 
-# How long to hold the MotionSensor "detected" after cycle end. Gives Apple
-# Home enough time to fire the notification even if the user closes the app.
+_DURATION_MAX = 3600  # HAP cap on SetDuration / RemainingDuration
 _MOTION_PULSE_SECONDS = 60
 
-# HAP characteristic permissions
 _PERM_READ = "pr"
-_PERM_WRITE = "pw"
 _PERM_NOTIFY = "ev"
 
 
@@ -101,13 +97,10 @@ class ThinqWasherAccessory(GroupedAccessory):
         self._status_entity: str | None = None
         self._remaining_entity: str | None = None
         self._total_entity: str | None = None
-        self._prev_running: bool | None = None
+        self._notification_entity: str | None = None
         self._motion_reset_cancel = None
         self._resolve_entities()
 
-        # Apply category + valve_type overrides from YAML, falling back to
-        # defaults. category is a class-level attr pyhap reads during setup;
-        # set it on the instance before pyhap serializes the accessory.
         cat_name = self.overrides.get("category") or _DEFAULT_CATEGORY_NAME
         self.category = _CATEGORY_MAP[cat_name]
         valve_type_name = (
@@ -115,9 +108,13 @@ class ThinqWasherAccessory(GroupedAccessory):
         )
         valve_type_value = _VALVE_TYPE_MAP[valve_type_name]
 
-        # When category=fan (dryer), add a Fan service BEFORE the Valve so
-        # Apple Home uses the fan icon for the tile. Valve stays as a
-        # secondary service to keep the countdown visible in the detail view.
+        self._finished_event_types = frozenset(
+            self.overrides.get("finished_event_types") or []
+        )
+
+        # --- Fan (optional, primary) ----------------------------------------
+        # When category=fan, add Fan BEFORE Valve so Apple Home uses the fan
+        # icon for the tile. Valve stays secondary with the countdown.
         self._char_fan_active = None
         if cat_name == "fan":
             serv_fan = self.add_preload_service(
@@ -135,7 +132,7 @@ class ThinqWasherAccessory(GroupedAccessory):
                 _CHAR_CONFIGURED_NAME, value=self.display_name
             )
 
-        # --- Valve (primary) -------------------------------------------------
+        # --- Valve (countdown bearer) ---------------------------------------
         serv_valve = self.add_preload_service(
             _SERV_VALVE,
             [
@@ -148,18 +145,13 @@ class ThinqWasherAccessory(GroupedAccessory):
                 _CHAR_CONFIGURED_NAME,
             ],
         )
-        # Active read-only: we reflect appliance state; we do not let
-        # Apple Home start/stop the cycle. HAP permits marking Active
-        # as pr+ev (no pw) — Apple Home renders a status indicator.
         self._char_active = serv_valve.configure_char(
             _CHAR_ACTIVE,
             value=0,
             properties={"Permissions": [_PERM_READ, _PERM_NOTIFY]},
         )
-        # Apple Home's tile UI hardcodes Valve/Active as a toggle regardless
-        # of our read-only HAP permissions. Best we can do is revert any
-        # client write to the real HA state via setter_callback — brief UI
-        # flicker on tap, but the value always snaps back within ~1s.
+        # Apple Home may still render Active as a toggle despite read-only
+        # permissions. Revert-on-write swallows any user tap.
         self._char_active.setter_callback = self._revert_active
         self._char_in_use = serv_valve.configure_char(_CHAR_IN_USE, value=0)
         serv_valve.configure_char(_CHAR_VALVE_TYPE, value=valve_type_value)
@@ -172,34 +164,30 @@ class ThinqWasherAccessory(GroupedAccessory):
         serv_valve.configure_char(_CHAR_NAME, value=self.display_name)
         serv_valve.configure_char(_CHAR_CONFIGURED_NAME, value=self.display_name)
 
-        # --- OccupancySensor "Finishing" (per-device configurable) ---------
-        finishing = self.overrides.get("finishing_states") or []
-        self._finishing_states = frozenset(finishing)
-        self._char_finishing = None
-        if self._finishing_states:
-            finishing_name = f"{self.display_name} Finishing"
-            serv_finishing = self.add_preload_service(
-                _SERV_OCCUPANCY,
-                [_CHAR_OCCUPANCY_DETECTED, _CHAR_NAME, _CHAR_CONFIGURED_NAME],
+        # --- MotionSensor "Finished" ----------------------------------------
+        # Triggered by event_type matches on event.*_notification, not by
+        # state transitions. Only created if the user configured event types
+        # AND we found a notification entity on the device.
+        self._char_motion = None
+        if self._finished_event_types and self._notification_entity:
+            motion_name = f"{self.display_name} Finished"
+            serv_motion = self.add_preload_service(
+                _SERV_MOTION,
+                [_CHAR_MOTION_DETECTED, _CHAR_NAME, _CHAR_CONFIGURED_NAME],
             )
-            self._char_finishing = serv_finishing.configure_char(
-                _CHAR_OCCUPANCY_DETECTED, value=0
+            self._char_motion = serv_motion.configure_char(
+                _CHAR_MOTION_DETECTED, value=False
             )
-            serv_finishing.configure_char(_CHAR_NAME, value=finishing_name)
-            serv_finishing.configure_char(
-                _CHAR_CONFIGURED_NAME, value=finishing_name
+            serv_motion.configure_char(_CHAR_NAME, value=motion_name)
+            serv_motion.configure_char(_CHAR_CONFIGURED_NAME, value=motion_name)
+        elif self._finished_event_types and not self._notification_entity:
+            _LOGGER.warning(
+                "%s: finished_event_types configured but no "
+                "event.*_notification entity found on device %s — Finished "
+                "sensor will not be created",
+                self.display_name,
+                self.device_id,
             )
-
-        # --- MotionSensor (cycle-finished pulse) ----------------------------
-        motion_name = f"{self.display_name} Finished"
-        serv_motion = self.add_preload_service(
-            _SERV_MOTION, [_CHAR_MOTION_DETECTED, _CHAR_NAME, _CHAR_CONFIGURED_NAME]
-        )
-        self._char_motion = serv_motion.configure_char(
-            _CHAR_MOTION_DETECTED, value=False
-        )
-        serv_motion.configure_char(_CHAR_NAME, value=motion_name)
-        serv_motion.configure_char(_CHAR_CONFIGURED_NAME, value=motion_name)
 
     def _resolve_entities(self) -> None:
         registry = er.async_get(self.hass)
@@ -211,6 +199,8 @@ class ThinqWasherAccessory(GroupedAccessory):
                 self._remaining_entity = eid
             elif eid.startswith("sensor.") and eid.endswith("_total_time"):
                 self._total_entity = eid
+            elif eid.startswith("event.") and eid.endswith("_notification"):
+                self._notification_entity = eid
 
         if not self._status_entity:
             _LOGGER.warning(
@@ -220,51 +210,61 @@ class ThinqWasherAccessory(GroupedAccessory):
             )
 
     def _watched_entities(self) -> Iterable[str]:
-        for eid in (self._status_entity, self._remaining_entity, self._total_entity):
+        for eid in (
+            self._status_entity,
+            self._remaining_entity,
+            self._total_entity,
+            self._notification_entity,
+        ):
             if eid:
                 yield eid
 
     def _push_state(self, entity_id: str, state: State | None) -> None:
-        if state is None or state.state in ("unknown", "unavailable"):
-            if entity_id == self._remaining_entity:
-                self._char_remaining.set_value(0)
-            elif entity_id == self._total_entity:
-                self._char_set_duration.set_value(0)
+        if state is None:
             return
 
         if entity_id == self._status_entity:
+            if state.state in ("unknown", "unavailable"):
+                return
             running = state.state in _RUNNING_STATES
             self._char_active.set_value(1 if running else 0)
             self._char_in_use.set_value(1 if running else 0)
             if self._char_fan_active is not None:
                 self._char_fan_active.set_value(1 if running else 0)
-            if self._char_finishing is not None:
-                self._char_finishing.set_value(
-                    1 if state.state in self._finishing_states else 0
-                )
             if not running:
                 self._char_remaining.set_value(0)
 
-            # Cycle-finished motion pulse: detect running -> not-running
-            # transition. Skip the first push at startup (prev is None) so
-            # we don't fire spuriously when the accessory is first primed.
-            if self._prev_running is True and not running:
-                self._fire_motion_pulse()
-            self._prev_running = running
-
         elif entity_id == self._remaining_entity:
+            if state.state in ("unknown", "unavailable"):
+                self._char_remaining.set_value(0)
+                return
             self._char_remaining.set_value(self._remaining_seconds(state.state))
 
         elif entity_id == self._total_entity:
+            if state.state in ("unknown", "unavailable"):
+                self._char_set_duration.set_value(0)
+                return
             try:
                 seconds = int(float(state.state)) * 60
             except (ValueError, TypeError):
                 seconds = 0
             self._char_set_duration.set_value(min(max(seconds, 0), _DURATION_MAX))
 
-    def _fire_motion_pulse(self) -> None:
-        """Pulse MotionDetected=True for a few seconds so iOS fires a
-        one-shot notification for cycle completion."""
+        elif entity_id == self._notification_entity:
+            self._maybe_fire_finished(state)
+
+    def _maybe_fire_finished(self, state: State) -> None:
+        """Fire the Finished motion pulse if the event matches a configured
+        finished_event_type. HA event entities update state (a timestamp)
+        and attribute event_type each time the source emits an event."""
+        if self._char_motion is None:
+            return
+        event_type = state.attributes.get("event_type")
+        if event_type is None:
+            return
+        if event_type not in self._finished_event_types:
+            return
+
         # Cancel any in-flight reset from a prior pulse.
         if self._motion_reset_cancel is not None:
             try:
@@ -273,11 +273,16 @@ class ThinqWasherAccessory(GroupedAccessory):
                 pass
             self._motion_reset_cancel = None
 
-        _LOGGER.info("%s cycle finished — firing motion pulse", self.display_name)
+        _LOGGER.info(
+            "%s: event '%s' matched — firing Finished motion pulse",
+            self.display_name,
+            event_type,
+        )
         self._char_motion.set_value(True)
 
         def _reset(_now):
-            self._char_motion.set_value(False)
+            if self._char_motion is not None:
+                self._char_motion.set_value(False)
             self._motion_reset_cancel = None
 
         self._motion_reset_cancel = async_call_later(

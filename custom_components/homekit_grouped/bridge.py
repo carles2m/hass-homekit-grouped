@@ -23,7 +23,7 @@ from pyhap.const import CATEGORY_OTHER
 from .const import (
     CONF_CATEGORY,
     CONF_DEVICE_ID,
-    CONF_FINISHING_STATES,
+    CONF_FINISHED_EVENT_TYPES,
     CONF_NAME,
     CONF_PROFILE,
     CONF_VALVE_TYPE,
@@ -81,7 +81,7 @@ class GroupedBridge:
                 overrides={
                     "category": cfg.get(CONF_CATEGORY),
                     "valve_type": cfg.get(CONF_VALVE_TYPE),
-                    "finishing_states": cfg.get(CONF_FINISHING_STATES),
+                    "finished_event_types": cfg.get(CONF_FINISHED_EVENT_TYPES),
                 },
             )
             bridge.add_accessory(accessory)
