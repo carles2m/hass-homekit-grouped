@@ -99,6 +99,10 @@ class ThinqWasherAccessory(GroupedAccessory):
         self._total_entity: str | None = None
         self._notification_entity: str | None = None
         self._motion_reset_cancel = None
+        # Last-seen timestamp of the notification entity. Used to detect
+        # whether we're looking at a replay of a historical event (HA
+        # restart) or a genuinely new fire. None = haven't seen any yet.
+        self._last_event_ts: str | None = None
         self._resolve_entities()
 
         cat_name = self.overrides.get("category") or _DEFAULT_CATEGORY_NAME
@@ -251,6 +255,19 @@ class ThinqWasherAccessory(GroupedAccessory):
             self._char_set_duration.set_value(min(max(seconds, 0), _DURATION_MAX))
 
         elif entity_id == self._notification_entity:
+            ts = state.state
+            if ts in ("unknown", "unavailable", None):
+                return
+            # Initial priming (HA restart, bridge startup): remember the
+            # current timestamp but do NOT fire — the event already happened,
+            # possibly days ago. Only a subsequent timestamp change means a
+            # genuinely new event.
+            if self._last_event_ts is None:
+                self._last_event_ts = ts
+                return
+            if ts == self._last_event_ts:
+                return
+            self._last_event_ts = ts
             self._maybe_fire_finished(state)
 
     def _maybe_fire_finished(self, state: State) -> None:
