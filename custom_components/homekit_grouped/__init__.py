@@ -14,6 +14,8 @@ YAML configuration:
         - profile: thinq_washer
           device_id: <ha_device_id>
           name: "Washer"
+          category: faucet        # optional: sprinkler | faucet | fan | other | shower_head
+          valve_type: faucet      # optional: generic | irrigation | shower | faucet
 """
 
 from __future__ import annotations
@@ -30,10 +32,13 @@ from .const import (
     CONF_BRIDGE,
     CONF_BRIDGE_NAME,
     CONF_BRIDGE_PORT,
+    CONF_CATEGORY,
     CONF_DEVICE_ID,
     CONF_DEVICES,
+    CONF_FINISHING_STATES,
     CONF_NAME,
     CONF_PROFILE,
+    CONF_VALVE_TYPE,
     DEFAULT_BRIDGE_NAME,
     DEFAULT_PORT,
     DOMAIN,
@@ -42,11 +47,19 @@ from .profiles import PROFILES
 
 _LOGGER = logging.getLogger(__name__)
 
+_CATEGORY_VALUES = ["sprinkler", "faucet", "fan", "other", "shower_head"]
+_VALVE_TYPE_VALUES = ["generic", "irrigation", "shower", "faucet"]
+
 _DEVICE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_PROFILE): vol.In(list(PROFILES)),
         vol.Required(CONF_DEVICE_ID): cv.string,
         vol.Required(CONF_NAME): cv.string,
+        vol.Optional(CONF_CATEGORY): vol.In(_CATEGORY_VALUES),
+        vol.Optional(CONF_VALVE_TYPE): vol.In(_VALVE_TYPE_VALUES),
+        vol.Optional(CONF_FINISHING_STATES): vol.All(
+            cv.ensure_list, [cv.string]
+        ),
     }
 )
 
@@ -89,7 +102,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     hass.data.setdefault(DOMAIN, {})["bridge"] = bridge
 
-    # Start the bridge after HA is fully started so all entities are available.
     async def _on_started(_event):
         await bridge.async_start()
 

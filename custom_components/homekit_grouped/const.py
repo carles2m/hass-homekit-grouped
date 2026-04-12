@@ -9,6 +9,9 @@ CONF_DEVICES = "devices"
 CONF_DEVICE_ID = "device_id"
 CONF_PROFILE = "profile"
 CONF_NAME = "name"
+CONF_CATEGORY = "category"
+CONF_VALVE_TYPE = "valve_type"
+CONF_FINISHING_STATES = "finishing_states"
 
 DEFAULT_PORT = 21065
 DEFAULT_BRIDGE_NAME = "HA Grouped Bridge"

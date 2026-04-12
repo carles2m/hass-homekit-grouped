@@ -20,7 +20,15 @@ from pyhap.accessory import Bridge
 from pyhap.accessory_driver import AccessoryDriver
 from pyhap.const import CATEGORY_OTHER
 
-from .const import CONF_DEVICE_ID, CONF_NAME, CONF_PROFILE, PAIRING_FILE
+from .const import (
+    CONF_CATEGORY,
+    CONF_DEVICE_ID,
+    CONF_FINISHING_STATES,
+    CONF_NAME,
+    CONF_PROFILE,
+    CONF_VALVE_TYPE,
+    PAIRING_FILE,
+)
 from .profiles import get_profile
 
 _LOGGER = logging.getLogger(__name__)
@@ -70,6 +78,11 @@ class GroupedBridge:
                 hass=self.hass,
                 name=cfg[CONF_NAME],
                 device_id=cfg[CONF_DEVICE_ID],
+                overrides={
+                    "category": cfg.get(CONF_CATEGORY),
+                    "valve_type": cfg.get(CONF_VALVE_TYPE),
+                    "finishing_states": cfg.get(CONF_FINISHING_STATES),
+                },
             )
             bridge.add_accessory(accessory)
             self._accessories.append(accessory)

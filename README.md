@@ -45,12 +45,27 @@ homekit_grouped:
     name: "HA Grouped Bridge"
   devices:
     - profile: thinq_washer
-      device_id: 29b86a58e7d41a7c3a0fb865bab61e14   # HA device_id of washer
+      device_id: <ha_device_id_of_washer>
       name: "Washer"
-    - profile: thinq_washer   # dryer uses same profile
-      device_id: 74a21be96458bab4d158cb8bf0a8f69e
+      category: faucet           # sprinkler | faucet | fan | other | shower_head
+      valve_type: faucet         # generic | irrigation | shower | faucet
+      finishing_states:          # cycle states that fire the "Finishing" sensor
+        - spinning
+        - drying
+    - profile: thinq_washer      # dryer uses same profile with different config
+      device_id: <ha_device_id_of_dryer>
       name: "Dryer"
+      category: fan
+      valve_type: irrigation     # irrigation gives the cleanest countdown UI
+      finishing_states:
+        - cooling
+        - wrinkle_care
 ```
+
+`category` affects the tile icon in Apple Home. `valve_type` determines whether
+the valve shows as a generic valve, irrigation (sprinkler-style countdown),
+shower, or water faucet. `finishing_states` must be set explicitly per device —
+meaningful late-cycle phases differ wildly by appliance.
 
 Remember to also remove those devices' entities from HA's built-in HomeKit bridge filter
 to avoid seeing them twice in Apple Home.

@@ -26,12 +26,14 @@ class GroupedAccessory(Accessory):
         hass: HomeAssistant,
         name: str,
         device_id: str,
+        overrides: dict | None = None,
     ) -> None:
         # AID is derived from device_id hash so it's stable across restarts.
         aid = (hash(device_id) & 0x7FFFFFFF) or 1
         super().__init__(driver=driver, display_name=name, aid=aid)
         self.hass = hass
         self.device_id = device_id
+        self.overrides = overrides or {}
         self._setup_services()
 
     # ---- profile hooks --------------------------------------------------
