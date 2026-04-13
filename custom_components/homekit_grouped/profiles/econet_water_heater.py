@@ -41,6 +41,7 @@ _LOGGER = logging.getLogger(__name__)
 _SERV_THERMOSTAT = "Thermostat"
 _SERV_MOTION = "MotionSensor"
 _SERV_OCCUPANCY = "OccupancySensor"
+_SERV_CONTACT = "ContactSensor"
 
 _CHAR_CURRENT_HEATING_COOLING = "CurrentHeatingCoolingState"
 _CHAR_TARGET_HEATING_COOLING = "TargetHeatingCoolingState"
@@ -49,6 +50,7 @@ _CHAR_TARGET_TEMPERATURE = "TargetTemperature"
 _CHAR_DISPLAY_UNITS = "TemperatureDisplayUnits"
 _CHAR_MOTION_DETECTED = "MotionDetected"
 _CHAR_OCCUPANCY_DETECTED = "OccupancyDetected"
+_CHAR_CONTACT_STATE = "ContactSensorState"
 _CHAR_NAME = "Name"
 _CHAR_CONFIGURED_NAME = "ConfiguredName"
 
@@ -103,6 +105,7 @@ class EcoNetWaterHeaterAccessory(GroupedAccessory):
             "hot_water_low_threshold"
         )
         alert_sensor = self.overrides.get("alert_sensor") is True
+        no_hot_water_sensor = self.overrides.get("no_hot_water_sensor") is True
 
         # --- Thermostat (primary) -------------------------------------------
         serv_therm = self.add_preload_service(
@@ -194,6 +197,27 @@ class EcoNetWaterHeaterAccessory(GroupedAccessory):
             )
             serv_low.configure_char(_CHAR_NAME, value=low_name)
             serv_low.configure_char(_CHAR_CONFIGURED_NAME, value=low_name)
+
+        # --- ContactSensor: No Hot Water (opt-in) ---------------------------
+        # Fires (open) when available_hot_water reaches 0%, closes again
+        # when it climbs above 0. ContactSensor notifications include the
+        # accessory name in iOS ("<Name>: was opened" / "was closed") so
+        # the alert is clearly identifiable, at the cost of two pings per
+        # event (open, then close). Acceptable for a rare event like the
+        # tank running dry.
+        self._char_no_hot_water = None
+        if no_hot_water_sensor and self._hot_water_entity:
+            empty_name = f"{self.display_name} No Hot Water"
+            serv_empty = self.add_preload_service(
+                _SERV_CONTACT,
+                [_CHAR_CONTACT_STATE, _CHAR_NAME, _CHAR_CONFIGURED_NAME],
+            )
+            # ContactSensorState: 0 = closed (contact detected), 1 = open
+            self._char_no_hot_water = serv_empty.configure_char(
+                _CHAR_CONTACT_STATE, value=0
+            )
+            serv_empty.configure_char(_CHAR_NAME, value=empty_name)
+            serv_empty.configure_char(_CHAR_CONFIGURED_NAME, value=empty_name)
 
     def _resolve_entities(self) -> None:
         registry = er.async_get(self.hass)
@@ -295,15 +319,17 @@ class EcoNetWaterHeaterAccessory(GroupedAccessory):
             self._char_current_mode.set_value(_HCS_OFF)
 
     def _push_hot_water(self, state: State) -> None:
-        if self._char_hot_water_low is None or self._hot_water_low_threshold is None:
-            return
         try:
             pct = int(float(state.state))
         except (TypeError, ValueError):
             return
-        self._char_hot_water_low.set_value(
-            1 if pct < self._hot_water_low_threshold else 0
-        )
+        if self._char_hot_water_low is not None and self._hot_water_low_threshold is not None:
+            self._char_hot_water_low.set_value(
+                1 if pct < self._hot_water_low_threshold else 0
+            )
+        if self._char_no_hot_water is not None:
+            # ContactSensor: 1 = open (alarming) when no hot water
+            self._char_no_hot_water.set_value(1 if pct == 0 else 0)
 
     def _push_alert(self, state: State) -> None:
         if self._char_alert is None:

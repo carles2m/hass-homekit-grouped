@@ -41,6 +41,7 @@ from .const import (
     CONF_FINISHED_EVENT_TYPES,
     CONF_HOT_WATER_LOW_THRESHOLD,
     CONF_NAME,
+    CONF_NO_HOT_WATER_SENSOR,
     CONF_PROFILE,
     CONF_TILE_SERVICE,
     CONF_VALVE_TYPE,
@@ -79,6 +80,7 @@ _DEVICE_SCHEMA = vol.Schema(
             vol.Coerce(int), vol.Range(min=1, max=99)
         ),
         vol.Optional(CONF_ALERT_SENSOR): cv.boolean,
+        vol.Optional(CONF_NO_HOT_WATER_SENSOR): cv.boolean,
     }
 )
 

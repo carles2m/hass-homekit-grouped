@@ -27,6 +27,7 @@ from .const import (
     CONF_FINISHED_EVENT_TYPES,
     CONF_HOT_WATER_LOW_THRESHOLD,
     CONF_NAME,
+    CONF_NO_HOT_WATER_SENSOR,
     CONF_PROFILE,
     CONF_TILE_SERVICE,
     CONF_VALVE_TYPE,
@@ -90,6 +91,7 @@ class GroupedBridge:
                         CONF_HOT_WATER_LOW_THRESHOLD
                     ),
                     "alert_sensor": cfg.get(CONF_ALERT_SENSOR),
+                    "no_hot_water_sensor": cfg.get(CONF_NO_HOT_WATER_SENSOR),
                 },
             )
             bridge.add_accessory(accessory)

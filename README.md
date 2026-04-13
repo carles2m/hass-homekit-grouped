@@ -24,11 +24,11 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
   alarm) + 2 Temperature Sensors (setpoints)
 - **EcoNet (Rheem) heat pump water heater** (`econet_water_heater` profile) —
   Thermostat with Off/Heat mode + temperature setpoint. Optional extras:
-  MotionSensor alert (opt-in) and OccupancySensor for low-hot-water
-  (opt-in with threshold). Replaces HA's built-in HomeKit thermostat
-  mapping that spams `TargetHeatingCoolingState value=0 is invalid`
-  errors on EcoNet modes like `eco` that don't map to HomeKit's
-  mode vocabulary.
+  MotionSensor alert (opt-in), OccupancySensor for low-hot-water (opt-in
+  with threshold), and ContactSensor for no-hot-water (opt-in, opens at
+  0% available). Replaces HA's built-in HomeKit thermostat mapping that
+  spams `TargetHeatingCoolingState value=0 is invalid` errors on EcoNet
+  modes like `eco` that don't map to HomeKit's mode vocabulary.
 
 More profiles to come. PRs welcome (but don't expect fast merges).
 
@@ -117,6 +117,13 @@ homekit_grouped:
   0 to >0. Unset/false by default — the notification ("Motion Detected
   in \<room\>") doesn't identify which alert, and EcoNet doesn't expose
   alert-type metadata, so this is opt-in.
+- **`no_hot_water_sensor`** (econet_water_heater only) — boolean. When
+  `true`, adds a ContactSensor "No Hot Water" that opens when the
+  appliance's `available_hot_water` sensor reaches 0%, closes when it
+  climbs back above 0. Apple Home notifications include the accessory
+  name ("\<Name\> No Hot Water: was opened") so it's clearly
+  identifiable, at the cost of a second "was closed" notification when
+  hot water comes back. Unset/false by default.
 
 ### Remember to remove entities from HA's built-in HomeKit bridge
 
