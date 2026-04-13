@@ -31,6 +31,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .bridge import GroupedBridge
 from .const import (
+    CONF_ALERT_SENSOR,
     CONF_BRIDGE,
     CONF_BRIDGE_NAME,
     CONF_BRIDGE_PORT,
@@ -38,6 +39,7 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_DEVICES,
     CONF_FINISHED_EVENT_TYPES,
+    CONF_HOT_WATER_LOW_THRESHOLD,
     CONF_NAME,
     CONF_PROFILE,
     CONF_TILE_SERVICE,
@@ -73,6 +75,10 @@ _DEVICE_SCHEMA = vol.Schema(
             cv.ensure_list, [cv.string]
         ),
         vol.Optional(CONF_TILE_SERVICE): vol.In(["fan", "garage_door"]),
+        vol.Optional(CONF_HOT_WATER_LOW_THRESHOLD): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=99)
+        ),
+        vol.Optional(CONF_ALERT_SENSOR): cv.boolean,
     }
 )
 

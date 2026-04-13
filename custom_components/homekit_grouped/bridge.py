@@ -21,9 +21,11 @@ from pyhap.accessory_driver import AccessoryDriver
 from pyhap.const import CATEGORY_OTHER
 
 from .const import (
+    CONF_ALERT_SENSOR,
     CONF_CATEGORY,
     CONF_DEVICE_ID,
     CONF_FINISHED_EVENT_TYPES,
+    CONF_HOT_WATER_LOW_THRESHOLD,
     CONF_NAME,
     CONF_PROFILE,
     CONF_TILE_SERVICE,
@@ -84,6 +86,10 @@ class GroupedBridge:
                     "valve_type": cfg.get(CONF_VALVE_TYPE),
                     "finished_event_types": cfg.get(CONF_FINISHED_EVENT_TYPES),
                     "tile_service": cfg.get(CONF_TILE_SERVICE),
+                    "hot_water_low_threshold": cfg.get(
+                        CONF_HOT_WATER_LOW_THRESHOLD
+                    ),
+                    "alert_sensor": cfg.get(CONF_ALERT_SENSOR),
                 },
             )
             bridge.add_accessory(accessory)

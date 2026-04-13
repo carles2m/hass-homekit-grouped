@@ -13,6 +13,8 @@ CONF_CATEGORY = "category"
 CONF_VALVE_TYPE = "valve_type"
 CONF_FINISHED_EVENT_TYPES = "finished_event_types"
 CONF_TILE_SERVICE = "tile_service"
+CONF_HOT_WATER_LOW_THRESHOLD = "hot_water_low_threshold"
+CONF_ALERT_SENSOR = "alert_sensor"
 
 DEFAULT_PORT = 21065
 DEFAULT_BRIDGE_NAME = "HA Grouped Bridge"

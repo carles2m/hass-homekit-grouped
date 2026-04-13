@@ -22,6 +22,13 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
 - **Home Connect fridge-freezer** (`home_connect_fridge` profile) — 2 Contact
   Sensors (doors) + 3 Motion Sensors (door-left-open alarms, over-temperature
   alarm) + 2 Temperature Sensors (setpoints)
+- **EcoNet (Rheem) heat pump water heater** (`econet_water_heater` profile) —
+  Thermostat with Off/Heat mode + temperature setpoint. Optional extras:
+  MotionSensor alert (opt-in) and OccupancySensor for low-hot-water
+  (opt-in with threshold). Replaces HA's built-in HomeKit thermostat
+  mapping that spams `TargetHeatingCoolingState value=0 is invalid`
+  errors on EcoNet modes like `eco` that don't map to HomeKit's
+  mode vocabulary.
 
 More profiles to come. PRs welcome (but don't expect fast merges).
 
@@ -76,6 +83,13 @@ homekit_grouped:
       name: "Fridge"
       category: other             # other | sensor | door | window
       tile_service: garage_door   # (optional) see "room tiles" below
+
+    # EcoNet (Rheem) heat pump water heater
+    - profile: econet_water_heater
+      device_id: <ha_device_id_of_water_heater>
+      name: "Water Heater"
+      hot_water_low_threshold: 30 # (optional) add OccupancySensor that
+                                  # fires when available_hot_water < N%
 ```
 
 ### Per-device options
@@ -93,6 +107,16 @@ homekit_grouped:
 - **`tile_service`** (home_connect_fridge only) — optional `garage_door`.
   Adds a fake actionable service so Apple Home shows the accessory as a
   room tile. See "Getting a room tile" below.
+- **`hot_water_low_threshold`** (econet_water_heater only) — integer 1-99.
+  When set, adds an OccupancySensor "Hot Water Low" that fires when the
+  appliance's `available_hot_water` sensor drops below this percent.
+  Unset by default — Apple Home's generic "Occupancy Detected" notification
+  text can be confusing, so this sensor is opt-in.
+- **`alert_sensor`** (econet_water_heater only) — boolean. When `true`,
+  adds a MotionSensor "Alert" that fires when `alert_count` goes from
+  0 to >0. Unset/false by default — the notification ("Motion Detected
+  in \<room\>") doesn't identify which alert, and EcoNet doesn't expose
+  alert-type metadata, so this is opt-in.
 
 ### Remember to remove entities from HA's built-in HomeKit bridge
 
