@@ -328,6 +328,20 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             pct = 66
         else:
             pct = 100
+
+        # HomeKit fires setter_callback for every intermediate slider value.
+        # Skip when the snapped target matches the fan's current state —
+        # otherwise redundant set_percentage calls would knock the Coway out
+        # of Auto or Night preset just by nudging the slider.
+        state = self.hass.states.get(self._fan_entity)
+        if state is not None:
+            is_on = state.state == "on"
+            cur_pct = state.attributes.get("percentage")
+            if pct == 0 and not is_on:
+                return
+            if pct > 0 and is_on and cur_pct == pct:
+                return
+
         if pct == 0:
             self.hass.async_create_task(
                 self.hass.services.async_call(
