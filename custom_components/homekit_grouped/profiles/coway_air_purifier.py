@@ -333,9 +333,12 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             except (ValueError, TypeError):
                 pass
 
-        preset = state.attributes.get("preset_mode")
+        # Coway exposes multiple Auto variants ("Auto", "Auto (Eco)") —
+        # both are Auto from HomeKit's point of view. Match by prefix so
+        # future variants are captured automatically.
+        preset = state.attributes.get("preset_mode") or ""
         self._char_target_state.set_value(
-            _AP_TARGET_AUTO if preset == _AUTO_PRESET else _AP_TARGET_MANUAL
+            _AP_TARGET_AUTO if preset.startswith(_AUTO_PRESET) else _AP_TARGET_MANUAL
         )
         if self._char_night is not None:
             self._char_night.set_value(1 if preset == _NIGHT_PRESET else 0)
