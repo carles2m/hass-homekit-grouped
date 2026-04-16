@@ -39,6 +39,8 @@ from .const import (
     CONF_CATEGORY,
     CONF_DEVICE_ID,
     CONF_DEVICES,
+    CONF_FILTER_CHANGE_SENSOR,
+    CONF_FILTER_CHANGE_THRESHOLD,
     CONF_FINISHED_EVENT_TYPES,
     CONF_HOT_WATER_LOW_THRESHOLD,
     CONF_LIGHT,
@@ -87,6 +89,10 @@ _DEVICE_SCHEMA = vol.Schema(
         vol.Optional(CONF_NIGHT_MODE_SWITCH): cv.boolean,
         vol.Optional(CONF_LIGHT): cv.boolean,
         vol.Optional(CONF_AMBIENT_LIGHT_SENSOR): cv.boolean,
+        vol.Optional(CONF_FILTER_CHANGE_SENSOR): cv.boolean,
+        vol.Optional(CONF_FILTER_CHANGE_THRESHOLD): vol.All(
+            vol.Coerce(int), vol.Range(min=1, max=99)
+        ),
     }
 )
 

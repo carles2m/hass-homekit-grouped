@@ -25,6 +25,8 @@ from .const import (
     CONF_AMBIENT_LIGHT_SENSOR,
     CONF_CATEGORY,
     CONF_DEVICE_ID,
+    CONF_FILTER_CHANGE_SENSOR,
+    CONF_FILTER_CHANGE_THRESHOLD,
     CONF_FINISHED_EVENT_TYPES,
     CONF_HOT_WATER_LOW_THRESHOLD,
     CONF_LIGHT,
@@ -98,6 +100,12 @@ class GroupedBridge:
                     "night_mode_switch": cfg.get(CONF_NIGHT_MODE_SWITCH),
                     "light": cfg.get(CONF_LIGHT),
                     "ambient_light_sensor": cfg.get(CONF_AMBIENT_LIGHT_SENSOR),
+                    "filter_change_sensor": cfg.get(
+                        CONF_FILTER_CHANGE_SENSOR
+                    ),
+                    "filter_change_threshold": cfg.get(
+                        CONF_FILTER_CHANGE_THRESHOLD
+                    ),
                 },
             )
             bridge.add_accessory(accessory)

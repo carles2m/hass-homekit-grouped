@@ -33,10 +33,10 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
   AirPurifier with Auto/Manual + speed slider (snaps to Off / Low / Med /
   High), linked AirQualitySensor (AirQuality enum + PM10Density), a
   Night-mode Switch that toggles the `Night` preset, a Lightbulb that
-  wraps the physical LED switch, and an opt-in LightSensor for the
-  built-in lux reading. Filter replacement is not exposed — Apple Home
-  doesn't render FilterMaintenance and the ContactSensor workaround
-  corrupted paired accessory schema during testing.
+  wraps the physical LED switch, an opt-in LightSensor for the built-in
+  lux reading, and an opt-in FilterMaintenance service that surfaces
+  "Replace Filter" in Apple Home when life drops below a configurable
+  threshold.
 
 More profiles to come. PRs welcome (but don't expect fast merges).
 
@@ -103,9 +103,11 @@ homekit_grouped:
     - profile: coway_air_purifier
       device_id: <ha_device_id_of_purifier>
       name: "Air Purifier"
-      # night_mode_switch: true     # (optional, default true) Night preset switch
-      # light: true                 # (optional, default true) LED lightbulb
+      # night_mode_switch: true     # (optional, default true)  Night preset switch
+      # light: true                 # (optional, default true)  LED lightbulb
       # ambient_light_sensor: true  # (optional, default false) built-in lux sensor
+      # filter_change_sensor: true  # (optional, default false) FilterMaintenance
+      # filter_change_threshold: 10 # (optional, default 10)    fire ChangeFilter below this %
 ```
 
 ### Per-device options
@@ -154,6 +156,17 @@ homekit_grouped:
   rare cases, can require re-pairing the bridge in Apple Home. Leave
   unset unless you want the lux reading visible to Apple Home /
   HomeKit automations.
+- **`filter_change_sensor`** (coway_air_purifier only) — boolean,
+  default `false`. Adds a HomeKit FilterMaintenance service driven by
+  the purifier's `sensor.*_max2_filter` life-remaining percentage.
+  Apple Home shows a yellow "Filter" badge on the accessory tile and a
+  "Replace Filter" row in accessory details when life drops below
+  `filter_change_threshold`. Same opt-in rationale as the light
+  sensor.
+- **`filter_change_threshold`** (coway_air_purifier only) — integer
+  1-99, default `10`. Percent life-remaining at which the
+  FilterMaintenance service flips to "Change Filter". Only consulted
+  when `filter_change_sensor` is on.
 
 ### Remember to remove entities from HA's built-in HomeKit bridge
 

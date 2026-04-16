@@ -19,6 +19,8 @@ CONF_NO_HOT_WATER_SENSOR = "no_hot_water_sensor"
 CONF_NIGHT_MODE_SWITCH = "night_mode_switch"
 CONF_LIGHT = "light"
 CONF_AMBIENT_LIGHT_SENSOR = "ambient_light_sensor"
+CONF_FILTER_CHANGE_SENSOR = "filter_change_sensor"
+CONF_FILTER_CHANGE_THRESHOLD = "filter_change_threshold"
 
 DEFAULT_PORT = 21065
 DEFAULT_BRIDGE_NAME = "HA Grouped Bridge"

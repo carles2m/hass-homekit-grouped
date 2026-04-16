@@ -22,13 +22,20 @@ Services:
   - Lightbulb (secondary) — wraps the `switch.*_light` entity.
   - LightSensor (secondary, opt-in via `ambient_light_sensor: true`) —
     CurrentAmbientLightLevel fed by the `sensor.*_lux` entity.
-    Opt-in because enabling it on an already-paired accessory changes
-    the service composition; worst case the bridge needs to be re-paired
-    in Apple Home.
+  - FilterMaintenance (secondary, opt-in via `filter_change_sensor:
+    true`) — FilterChangeIndication flips to ChangeFilter(1) when the
+    `sensor.*_max2_filter` life-remaining percentage drops below
+    `filter_change_threshold` (default 10). FilterLifeLevel mirrors
+    the raw value. Both opt-in sensors are gated because enabling
+    them on an already-paired accessory changes the service
+    composition; worst case the bridge needs to be re-paired.
 
-Filter replacement is not exposed. Apple Home doesn't render
-FilterMaintenance visibly, and a ContactSensor-based "Replace Filter"
-pattern corrupted Apple Home's accessory schema during testing.
+A prior FilterMaintenance attempt was pulled on the belief iOS
+doesn't render the service. On re-reading the HAP spec,
+FilterChangeIndication is *required* and the earlier implementation
+likely omitted it — iOS silently ignores services missing required
+characteristics, which matches the "doesn't render" symptom. This
+implementation declares it correctly.
 
 Entities ignored for now (niche config, set-and-forget):
   - select.*_current_timer, select.*_smart_mode_sensitivity,
@@ -54,6 +61,7 @@ _SERV_AIR_QUALITY = "AirQualitySensor"
 _SERV_SWITCH = "Switch"
 _SERV_LIGHTBULB = "Lightbulb"
 _SERV_LIGHT_SENSOR = "LightSensor"
+_SERV_FILTER_MAINTENANCE = "FilterMaintenance"
 
 _CHAR_ACTIVE = "Active"
 _CHAR_CURRENT_AP_STATE = "CurrentAirPurifierState"
@@ -62,6 +70,8 @@ _CHAR_ROTATION_SPEED = "RotationSpeed"
 _CHAR_AIR_QUALITY = "AirQuality"
 _CHAR_PM10_DENSITY = "PM10Density"
 _CHAR_AMBIENT_LIGHT = "CurrentAmbientLightLevel"
+_CHAR_FILTER_CHANGE_INDICATION = "FilterChangeIndication"
+_CHAR_FILTER_LIFE_LEVEL = "FilterLifeLevel"
 _CHAR_ON = "On"
 _CHAR_NAME = "Name"
 _CHAR_CONFIGURED_NAME = "ConfiguredName"
@@ -69,6 +79,11 @@ _CHAR_CONFIGURED_NAME = "ConfiguredName"
 # HAP CurrentAmbientLightLevel valid range in lux.
 _LUX_MIN = 0.0001
 _LUX_MAX = 100000.0
+
+# HAP FilterChangeIndication enum: 0=FilterOK, 1=ChangeFilter.
+_FILTER_OK = 0
+_FILTER_CHANGE = 1
+_FILTER_CHANGE_THRESHOLD_DEFAULT = 10  # % — fire ChangeFilter below this
 
 # HAP AirPurifier enums
 _AP_INACTIVE = 0
@@ -107,6 +122,7 @@ class CowayAirPurifierAccessory(GroupedAccessory):
         self._pm10_entity: str | None = None
         self._air_quality_entity: str | None = None
         self._lux_entity: str | None = None
+        self._filter_entity: str | None = None
         self._resolve_entities()
 
         expose_night_switch = (
@@ -114,8 +130,17 @@ class CowayAirPurifierAccessory(GroupedAccessory):
         )
         expose_light = self.overrides.get("light") is not False
         expose_lux = self.overrides.get("ambient_light_sensor") is True
+        expose_filter = self.overrides.get("filter_change_sensor") is True
+        self._filter_change_threshold = int(
+            self.overrides.get("filter_change_threshold")
+            or _FILTER_CHANGE_THRESHOLD_DEFAULT
+        )
 
-        # --- AirPurifier (primary) ------------------------------------------
+        # --- AirPurifier (HAP primary service) ------------------------------
+        # Mirrors HA core: sub-services (FilterMaintenance in particular)
+        # only render when linked to a service that's marked as the
+        # accessory's primary in HAP. Accessory category alone is not
+        # enough; iOS looks at the is_primary_service flag.
         serv_ap = self.add_preload_service(
             _SERV_AIR_PURIFIER,
             [
@@ -195,7 +220,7 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             )
             self._char_light.setter_callback = self._handle_light_set
 
-        # --- LightSensor (appended LAST to keep existing IIDs stable) -------
+        # --- LightSensor ----------------------------------------------------
         self._char_ambient_light = None
         if expose_lux and self._lux_entity:
             lux_name = f"{self.display_name} Light Level"
@@ -209,6 +234,37 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             serv_lux.configure_char(_CHAR_NAME, value=lux_name)
             serv_lux.configure_char(_CHAR_CONFIGURED_NAME, value=lux_name)
             serv_ap.add_linked_service(serv_lux)
+
+        # --- FilterMaintenance (appended LAST) ------------------------------
+        # Required char is FilterChangeIndication; FilterLifeLevel is
+        # optional but useful. Omitting FilterChangeIndication would make
+        # the service invalid and iOS would silently ignore it.
+        self._char_filter_change = None
+        self._char_filter_life = None
+        if expose_filter and self._filter_entity:
+            filter_name = f"{self.display_name} Filter"
+            # Char set + order mirror HA core's reference implementation
+            # (PR #142467). ConfiguredName is deliberately omitted — it's
+            # not in HAP's spec for FilterMaintenance, and iOS rejects
+            # services carrying off-spec characteristics.
+            serv_filter = self.add_preload_service(
+                _SERV_FILTER_MAINTENANCE,
+                [
+                    _CHAR_NAME,
+                    _CHAR_FILTER_CHANGE_INDICATION,
+                    _CHAR_FILTER_LIFE_LEVEL,
+                ],
+            )
+            serv_filter.configure_char(_CHAR_NAME, value=filter_name)
+            self._char_filter_change = serv_filter.configure_char(
+                _CHAR_FILTER_CHANGE_INDICATION, value=_FILTER_OK
+            )
+            self._char_filter_life = serv_filter.configure_char(
+                _CHAR_FILTER_LIFE_LEVEL, value=100
+            )
+            serv_ap.add_linked_service(serv_filter)
+
+        self.set_primary_service(serv_ap)
 
     def _resolve_entities(self) -> None:
         registry = er.async_get(self.hass)
@@ -224,6 +280,8 @@ class CowayAirPurifierAccessory(GroupedAccessory):
                 self._air_quality_entity = eid
             elif eid.startswith("sensor.") and eid.endswith("_lux"):
                 self._lux_entity = eid
+            elif eid.startswith("sensor.") and eid.endswith("_max2_filter"):
+                self._filter_entity = eid
 
         if not self._fan_entity:
             _LOGGER.warning(
@@ -239,6 +297,7 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             self._pm10_entity,
             self._air_quality_entity,
             self._lux_entity,
+            self._filter_entity,
         ):
             if eid:
                 yield eid
@@ -257,6 +316,8 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             self._push_air_quality(state)
         elif entity_id == self._lux_entity:
             self._push_lux(state)
+        elif entity_id == self._filter_entity:
+            self._push_filter(state)
 
     def _push_fan(self, state: State) -> None:
         on = state.state == "on"
@@ -308,6 +369,24 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             return
         self._char_ambient_light.set_value(
             max(_LUX_MIN, min(_LUX_MAX, value))
+        )
+
+    def _push_filter(self, state: State) -> None:
+        # max2_filter is % life remaining (100=new, 0=dead). Fire
+        # ChangeFilter when the value drops BELOW threshold.
+        if self._char_filter_change is None:
+            return
+        if state.state in ("unknown", "unavailable"):
+            return
+        try:
+            level = int(float(state.state))
+        except (ValueError, TypeError):
+            return
+        level = max(0, min(100, level))
+        if self._char_filter_life is not None:
+            self._char_filter_life.set_value(level)
+        self._char_filter_change.set_value(
+            _FILTER_CHANGE if level < self._filter_change_threshold else _FILTER_OK
         )
 
     # ---- writes from HomeKit back to HA --------------------------------
