@@ -16,6 +16,9 @@ CONF_TILE_SERVICE = "tile_service"
 CONF_HOT_WATER_LOW_THRESHOLD = "hot_water_low_threshold"
 CONF_ALERT_SENSOR = "alert_sensor"
 CONF_NO_HOT_WATER_SENSOR = "no_hot_water_sensor"
+CONF_NIGHT_MODE_SWITCH = "night_mode_switch"
+CONF_LIGHT = "light"
+CONF_AMBIENT_LIGHT_SENSOR = "ambient_light_sensor"
 
 DEFAULT_PORT = 21065
 DEFAULT_BRIDGE_NAME = "HA Grouped Bridge"

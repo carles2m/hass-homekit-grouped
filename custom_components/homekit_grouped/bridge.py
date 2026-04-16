@@ -22,11 +22,14 @@ from pyhap.const import CATEGORY_OTHER
 
 from .const import (
     CONF_ALERT_SENSOR,
+    CONF_AMBIENT_LIGHT_SENSOR,
     CONF_CATEGORY,
     CONF_DEVICE_ID,
     CONF_FINISHED_EVENT_TYPES,
     CONF_HOT_WATER_LOW_THRESHOLD,
+    CONF_LIGHT,
     CONF_NAME,
+    CONF_NIGHT_MODE_SWITCH,
     CONF_NO_HOT_WATER_SENSOR,
     CONF_PROFILE,
     CONF_TILE_SERVICE,
@@ -92,6 +95,9 @@ class GroupedBridge:
                     ),
                     "alert_sensor": cfg.get(CONF_ALERT_SENSOR),
                     "no_hot_water_sensor": cfg.get(CONF_NO_HOT_WATER_SENSOR),
+                    "night_mode_switch": cfg.get(CONF_NIGHT_MODE_SWITCH),
+                    "light": cfg.get(CONF_LIGHT),
+                    "ambient_light_sensor": cfg.get(CONF_AMBIENT_LIGHT_SENSOR),
                 },
             )
             bridge.add_accessory(accessory)

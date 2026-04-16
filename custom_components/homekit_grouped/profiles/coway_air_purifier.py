@@ -16,10 +16,15 @@ Services:
   - AirQualitySensor (secondary) — AirQuality enum from the
     `*_indoor_air_quality` sensor plus PM10Density from
     `*_particulate_matter_10`.
-  - Lightbulb (secondary) — wraps the `switch.*_light` entity.
   - Switch "Night" (secondary) — toggles the "Night" preset mode on
     the fan (HomeKit AirPurifier has no native Night mode
     characteristic).
+  - Lightbulb (secondary) — wraps the `switch.*_light` entity.
+  - LightSensor (secondary, opt-in via `ambient_light_sensor: true`) —
+    CurrentAmbientLightLevel fed by the `sensor.*_lux` entity.
+    Opt-in because enabling it on an already-paired accessory changes
+    the service composition; worst case the bridge needs to be re-paired
+    in Apple Home.
 
 Filter replacement is not exposed. Apple Home doesn't render
 FilterMaintenance visibly, and a ContactSensor-based "Replace Filter"
@@ -28,7 +33,7 @@ pattern corrupted Apple Home's accessory schema during testing.
 Entities ignored for now (niche config, set-and-forget):
   - select.*_current_timer, select.*_smart_mode_sensitivity,
     select.*_pre_filter_wash_frequency, sensor.*_pre_filter,
-    sensor.*_timer_remaining, sensor.*_lux.
+    sensor.*_timer_remaining.
 """
 
 from __future__ import annotations
@@ -48,6 +53,7 @@ _SERV_AIR_PURIFIER = "AirPurifier"
 _SERV_AIR_QUALITY = "AirQualitySensor"
 _SERV_SWITCH = "Switch"
 _SERV_LIGHTBULB = "Lightbulb"
+_SERV_LIGHT_SENSOR = "LightSensor"
 
 _CHAR_ACTIVE = "Active"
 _CHAR_CURRENT_AP_STATE = "CurrentAirPurifierState"
@@ -55,9 +61,14 @@ _CHAR_TARGET_AP_STATE = "TargetAirPurifierState"
 _CHAR_ROTATION_SPEED = "RotationSpeed"
 _CHAR_AIR_QUALITY = "AirQuality"
 _CHAR_PM10_DENSITY = "PM10Density"
+_CHAR_AMBIENT_LIGHT = "CurrentAmbientLightLevel"
 _CHAR_ON = "On"
 _CHAR_NAME = "Name"
 _CHAR_CONFIGURED_NAME = "ConfiguredName"
+
+# HAP CurrentAmbientLightLevel valid range in lux.
+_LUX_MIN = 0.0001
+_LUX_MAX = 100000.0
 
 # HAP AirPurifier enums
 _AP_INACTIVE = 0
@@ -95,12 +106,14 @@ class CowayAirPurifierAccessory(GroupedAccessory):
         self._light_entity: str | None = None
         self._pm10_entity: str | None = None
         self._air_quality_entity: str | None = None
+        self._lux_entity: str | None = None
         self._resolve_entities()
 
         expose_night_switch = (
             self.overrides.get("night_mode_switch") is not False
         )
         expose_light = self.overrides.get("light") is not False
+        expose_lux = self.overrides.get("ambient_light_sensor") is True
 
         # --- AirPurifier (primary) ------------------------------------------
         serv_ap = self.add_preload_service(
@@ -182,6 +195,21 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             )
             self._char_light.setter_callback = self._handle_light_set
 
+        # --- LightSensor (appended LAST to keep existing IIDs stable) -------
+        self._char_ambient_light = None
+        if expose_lux and self._lux_entity:
+            lux_name = f"{self.display_name} Light Level"
+            serv_lux = self.add_preload_service(
+                _SERV_LIGHT_SENSOR,
+                [_CHAR_AMBIENT_LIGHT, _CHAR_NAME, _CHAR_CONFIGURED_NAME],
+            )
+            self._char_ambient_light = serv_lux.configure_char(
+                _CHAR_AMBIENT_LIGHT, value=_LUX_MIN
+            )
+            serv_lux.configure_char(_CHAR_NAME, value=lux_name)
+            serv_lux.configure_char(_CHAR_CONFIGURED_NAME, value=lux_name)
+            serv_ap.add_linked_service(serv_lux)
+
     def _resolve_entities(self) -> None:
         registry = er.async_get(self.hass)
         for entry in er.async_entries_for_device(registry, self.device_id):
@@ -194,6 +222,8 @@ class CowayAirPurifierAccessory(GroupedAccessory):
                 self._pm10_entity = eid
             elif eid.startswith("sensor.") and eid.endswith("_indoor_air_quality"):
                 self._air_quality_entity = eid
+            elif eid.startswith("sensor.") and eid.endswith("_lux"):
+                self._lux_entity = eid
 
         if not self._fan_entity:
             _LOGGER.warning(
@@ -208,6 +238,7 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             self._light_entity,
             self._pm10_entity,
             self._air_quality_entity,
+            self._lux_entity,
         ):
             if eid:
                 yield eid
@@ -224,6 +255,8 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             self._push_pm10(state)
         elif entity_id == self._air_quality_entity:
             self._push_air_quality(state)
+        elif entity_id == self._lux_entity:
+            self._push_lux(state)
 
     def _push_fan(self, state: State) -> None:
         on = state.state == "on"
@@ -263,6 +296,19 @@ class CowayAirPurifierAccessory(GroupedAccessory):
             return
         key = (state.state or "").strip().lower()
         self._char_air_quality.set_value(_AIR_QUALITY_MAP.get(key, 0))
+
+    def _push_lux(self, state: State) -> None:
+        if self._char_ambient_light is None:
+            return
+        if state.state in ("unknown", "unavailable"):
+            return
+        try:
+            value = float(state.state)
+        except (ValueError, TypeError):
+            return
+        self._char_ambient_light.set_value(
+            max(_LUX_MIN, min(_LUX_MAX, value))
+        )
 
     # ---- writes from HomeKit back to HA --------------------------------
 

@@ -32,6 +32,7 @@ from homeassistant.helpers.typing import ConfigType
 from .bridge import GroupedBridge
 from .const import (
     CONF_ALERT_SENSOR,
+    CONF_AMBIENT_LIGHT_SENSOR,
     CONF_BRIDGE,
     CONF_BRIDGE_NAME,
     CONF_BRIDGE_PORT,
@@ -40,7 +41,9 @@ from .const import (
     CONF_DEVICES,
     CONF_FINISHED_EVENT_TYPES,
     CONF_HOT_WATER_LOW_THRESHOLD,
+    CONF_LIGHT,
     CONF_NAME,
+    CONF_NIGHT_MODE_SWITCH,
     CONF_NO_HOT_WATER_SENSOR,
     CONF_PROFILE,
     CONF_TILE_SERVICE,
@@ -81,6 +84,9 @@ _DEVICE_SCHEMA = vol.Schema(
         ),
         vol.Optional(CONF_ALERT_SENSOR): cv.boolean,
         vol.Optional(CONF_NO_HOT_WATER_SENSOR): cv.boolean,
+        vol.Optional(CONF_NIGHT_MODE_SWITCH): cv.boolean,
+        vol.Optional(CONF_LIGHT): cv.boolean,
+        vol.Optional(CONF_AMBIENT_LIGHT_SENSOR): cv.boolean,
     }
 )
 

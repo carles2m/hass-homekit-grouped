@@ -32,10 +32,11 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
 - **Coway Airmega / IoCare air purifier** (`coway_air_purifier` profile) —
   AirPurifier with Auto/Manual + speed slider (snaps to Off / Low / Med /
   High), linked AirQualitySensor (AirQuality enum + PM10Density), a
-  Night-mode Switch that toggles the `Night` preset, and a Lightbulb that
-  wraps the physical LED switch. Filter replacement is not exposed —
-  Apple Home doesn't render FilterMaintenance and the ContactSensor
-  workaround corrupted paired accessory schema during testing.
+  Night-mode Switch that toggles the `Night` preset, a Lightbulb that
+  wraps the physical LED switch, and an opt-in LightSensor for the
+  built-in lux reading. Filter replacement is not exposed — Apple Home
+  doesn't render FilterMaintenance and the ContactSensor workaround
+  corrupted paired accessory schema during testing.
 
 More profiles to come. PRs welcome (but don't expect fast merges).
 
@@ -102,8 +103,9 @@ homekit_grouped:
     - profile: coway_air_purifier
       device_id: <ha_device_id_of_purifier>
       name: "Air Purifier"
-      # night_mode_switch: true   # (optional, default true) Night preset switch
-      # light: true               # (optional, default true) LED lightbulb
+      # night_mode_switch: true     # (optional, default true) Night preset switch
+      # light: true                 # (optional, default true) LED lightbulb
+      # ambient_light_sensor: true  # (optional, default false) built-in lux sensor
 ```
 
 ### Per-device options
@@ -145,6 +147,13 @@ homekit_grouped:
 - **`light`** (coway_air_purifier only) — boolean, default `true`.
   Exposes the purifier's LED ring as a HomeKit Lightbulb driven by the
   corresponding `switch.*_light` entity. Set to `false` to hide it.
+- **`ambient_light_sensor`** (coway_air_purifier only) — boolean,
+  default `false`. Adds a HomeKit LightSensor driven by the purifier's
+  built-in `sensor.*_lux` reading. Opt-in because flipping it on an
+  already-paired accessory changes the service composition and, in
+  rare cases, can require re-pairing the bridge in Apple Home. Leave
+  unset unless you want the lux reading visible to Apple Home /
+  HomeKit automations.
 
 ### Remember to remove entities from HA's built-in HomeKit bridge
 
