@@ -120,6 +120,7 @@ class ThinqWasherAccessory(GroupedAccessory):
         # When category=fan, add Fan BEFORE Valve so Apple Home uses the fan
         # icon for the tile. Valve stays secondary with the countdown.
         self._char_fan_active = None
+        serv_fan = None
         if cat_name == "fan":
             serv_fan = self.add_preload_service(
                 _SERV_FAN,
@@ -192,6 +193,11 @@ class ThinqWasherAccessory(GroupedAccessory):
                 self.display_name,
                 self.device_id,
             )
+
+        # Mark the tile's primary service (Fanv2 for the dryer, Valve
+        # otherwise) so future strict sub-services would render. Current
+        # sub-services are "forgiving" and work without it.
+        self.set_primary_service(serv_fan if serv_fan is not None else serv_valve)
 
     def _resolve_entities(self) -> None:
         registry = er.async_get(self.hass)

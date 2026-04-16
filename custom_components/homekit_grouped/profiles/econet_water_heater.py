@@ -219,6 +219,11 @@ class EcoNetWaterHeaterAccessory(GroupedAccessory):
             serv_empty.configure_char(_CHAR_NAME, value=empty_name)
             serv_empty.configure_char(_CHAR_CONFIGURED_NAME, value=empty_name)
 
+        # Mark the Thermostat as HAP primary so future strict sub-services
+        # (FilterMaintenance-class) would render. Current sub-services are
+        # "forgiving" and work either way; this is purely future-proofing.
+        self.set_primary_service(serv_therm)
+
     def _resolve_entities(self) -> None:
         registry = er.async_get(self.hass)
         for entry in er.async_entries_for_device(registry, self.device_id):

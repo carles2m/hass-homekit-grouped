@@ -134,9 +134,14 @@ class HomeConnectFridgeAccessory(GroupedAccessory):
         self._char_garage_target = None
         tile_service = self.overrides.get("tile_service")
         if tile_service == "garage_door":
-            self._add_garage_door(self.display_name)
+            serv_garage = self._add_garage_door(self.display_name)
+            # Pure-sensor fridge has no natural primary service, so we
+            # only mark one when tile_service adds an actionable service.
+            # Future-proofs strict sub-service rendering the same way as
+            # the coway profile.
+            self.set_primary_service(serv_garage)
 
-    def _add_garage_door(self, name: str) -> None:
+    def _add_garage_door(self, name: str):
         """GarageDoorOpener service driven by the refrigerator door's
         open/closed state. TargetDoorState writes are reverted — the
         fridge can't actually be commanded open/closed from HomeKit."""
@@ -160,6 +165,7 @@ class HomeConnectFridgeAccessory(GroupedAccessory):
         serv.configure_char(_CHAR_OBSTRUCTION_DETECTED, value=False)
         serv.configure_char(_CHAR_NAME, value=name)
         serv.configure_char(_CHAR_CONFIGURED_NAME, value=name)
+        return serv
 
     def _revert_garage_target(self, _requested_value: int) -> None:
         """Ignore client writes to TargetDoorState; snap back to the real
