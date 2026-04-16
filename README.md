@@ -29,6 +29,13 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
   0% available). Replaces HA's built-in HomeKit thermostat mapping that
   spams `TargetHeatingCoolingState value=0 is invalid` errors on EcoNet
   modes like `eco` that don't map to HomeKit's mode vocabulary.
+- **Coway Airmega / IoCare air purifier** (`coway_air_purifier` profile) —
+  AirPurifier with Auto/Manual + speed slider (snaps to Off / Low / Med /
+  High), linked AirQualitySensor (AirQuality enum + PM10Density), a
+  Night-mode Switch that toggles the `Night` preset, and a Lightbulb that
+  wraps the physical LED switch. Filter replacement is not exposed —
+  Apple Home doesn't render FilterMaintenance and the ContactSensor
+  workaround corrupted paired accessory schema during testing.
 
 More profiles to come. PRs welcome (but don't expect fast merges).
 
@@ -90,6 +97,13 @@ homekit_grouped:
       name: "Water Heater"
       hot_water_low_threshold: 30 # (optional) add OccupancySensor that
                                   # fires when available_hot_water < N%
+
+    # Coway Airmega / IoCare air purifier
+    - profile: coway_air_purifier
+      device_id: <ha_device_id_of_purifier>
+      name: "Air Purifier"
+      # night_mode_switch: true   # (optional, default true) Night preset switch
+      # light: true               # (optional, default true) LED lightbulb
 ```
 
 ### Per-device options
@@ -124,6 +138,13 @@ homekit_grouped:
   name ("\<Name\> No Hot Water: was opened") so it's clearly
   identifiable, at the cost of a second "was closed" notification when
   hot water comes back. Unset/false by default.
+- **`night_mode_switch`** (coway_air_purifier only) — boolean, default
+  `true`. Exposes a Switch that toggles the fan's `Night` preset mode
+  (HomeKit's AirPurifier service has no native night-mode characteristic).
+  Set to `false` to drop the switch if you don't use Night mode.
+- **`light`** (coway_air_purifier only) — boolean, default `true`.
+  Exposes the purifier's LED ring as a HomeKit Lightbulb driven by the
+  corresponding `switch.*_light` entity. Set to `false` to hide it.
 
 ### Remember to remove entities from HA's built-in HomeKit bridge
 

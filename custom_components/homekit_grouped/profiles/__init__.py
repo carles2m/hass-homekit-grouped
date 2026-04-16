@@ -1,6 +1,7 @@
 """Device profiles for homekit_grouped."""
 
 from .base import GroupedAccessory
+from .coway_air_purifier import CowayAirPurifierAccessory
 from .econet_water_heater import EcoNetWaterHeaterAccessory
 from .home_connect_fridge import HomeConnectFridgeAccessory
 from .thinq_washer import ThinqWasherAccessory
@@ -9,6 +10,7 @@ PROFILES: dict[str, type[GroupedAccessory]] = {
     "thinq_washer": ThinqWasherAccessory,
     "home_connect_fridge": HomeConnectFridgeAccessory,
     "econet_water_heater": EcoNetWaterHeaterAccessory,
+    "coway_air_purifier": CowayAirPurifierAccessory,
 }
 
 
