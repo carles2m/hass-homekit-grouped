@@ -37,6 +37,16 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
   lux reading, and an opt-in FilterMaintenance service that surfaces
   "Replace Filter" in Apple Home when life drops below a configurable
   threshold.
+- **GE / Monogram gas cooktop** (`ge_cooktop` profile, via the
+  third-party `ge_home` integration) — Valve as the primary service,
+  carrying the kitchen timer (writable end-to-end: SetDuration in
+  Apple Home pushes minutes to the device, RemainingDuration counts
+  down, Active=0 stops the timer). Linked services: a sustained
+  MotionSensor that fires while any burner is on, a pulse
+  MotionSensor for the timer-expiry beep, and a read-only
+  ContactSensor for the cooktop lock (closed=locked; the lock can't
+  be unlocked from third-party clients per Brillion's per-client
+  writability policy).
 
 More profiles to come. PRs welcome (but don't expect fast merges).
 
@@ -108,6 +118,13 @@ homekit_grouped:
       # ambient_light_sensor: true  # (optional, default false) built-in lux sensor
       # filter_change_sensor: true  # (optional, default false) FilterMaintenance
       # filter_change_threshold: 10 # (optional, default 10)    fire ChangeFilter below this %
+
+    # GE / Monogram gas cooktop (via ge_home integration)
+    - profile: ge_cooktop
+      device_id: <ha_device_id_of_cooktop>
+      name: "Cooktop"
+      # category: faucet            # (optional, default faucet)
+      # valve_type: irrigation      # (optional, default irrigation)
 ```
 
 ### Per-device options
