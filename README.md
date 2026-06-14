@@ -32,7 +32,8 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
 - **Coway Airmega / IoCare air purifier** (`coway_air_purifier` profile) —
   AirPurifier with Auto/Manual + speed slider (snaps to Off / Low / Med /
   High), linked AirQualitySensor (AirQuality enum + PM10Density), a
-  Night-mode Switch that toggles the `Night` preset, a Lightbulb that
+  Night-mode Switch that turns the `Night` preset on (off returns to
+  `Auto`), a Lightbulb that
   wraps the physical LED switch, an opt-in LightSensor for the built-in
   lux reading, and an opt-in FilterMaintenance service that surfaces
   "Replace Filter" in Apple Home when life drops below a configurable
@@ -160,8 +161,9 @@ homekit_grouped:
   identifiable, at the cost of a second "was closed" notification when
   hot water comes back. Unset/false by default.
 - **`night_mode_switch`** (coway_air_purifier only) — boolean, default
-  `true`. Exposes a Switch that toggles the fan's `Night` preset mode
-  (HomeKit's AirPurifier service has no native night-mode characteristic).
+  `true`. Exposes a Switch that turns the fan's `Night` preset mode on;
+  switching it off returns the fan to `Auto` (HomeKit's AirPurifier
+  service has no native night-mode characteristic).
   Set to `false` to drop the switch if you don't use Night mode.
 - **`light`** (coway_air_purifier only) — boolean, default `true`.
   Exposes the purifier's LED ring as a HomeKit Lightbulb driven by the

@@ -17,8 +17,8 @@ Services:
     `*_indoor_air_quality` sensor plus PM10Density from
     `*_particulate_matter_10`.
   - Switch "Night" (secondary) — toggles the "Night" preset mode on
-    the fan (HomeKit AirPurifier has no native Night mode
-    characteristic).
+    the fan (on -> Night, off -> Auto; HomeKit AirPurifier has no
+    native Night mode characteristic).
   - Lightbulb (secondary) — wraps the `switch.*_light` entity.
   - LightSensor (secondary, opt-in via `ambient_light_sensor: true`) —
     CurrentAmbientLightLevel fed by the `sensor.*_lux` entity.
@@ -505,12 +505,15 @@ class CowayAirPurifierAccessory(GroupedAccessory):
                 )
             )
         else:
-            # Exit Night by setting a manual percentage.
+            # Exit Night -> Auto (switch off returns to Auto, not a manual speed).
             self.hass.async_create_task(
                 self.hass.services.async_call(
                     "fan",
-                    "set_percentage",
-                    {"entity_id": self._fan_entity, "percentage": 33},
+                    "set_preset_mode",
+                    {
+                        "entity_id": self._fan_entity,
+                        "preset_mode": _AUTO_PRESET,
+                    },
                     blocking=False,
                 )
             )
