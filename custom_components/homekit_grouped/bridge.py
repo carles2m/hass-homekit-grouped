@@ -25,6 +25,7 @@ from .const import (
     CONF_AMBIENT_LIGHT_SENSOR,
     CONF_CATEGORY,
     CONF_DEVICE_ID,
+    CONF_ENTITIES,
     CONF_FILTER_CHANGE_SENSOR,
     CONF_FILTER_CHANGE_THRESHOLD,
     CONF_FINISHED_EVENT_TYPES,
@@ -106,6 +107,7 @@ class GroupedBridge:
                     "filter_change_threshold": cfg.get(
                         CONF_FILTER_CHANGE_THRESHOLD
                     ),
+                    "entities": cfg.get(CONF_ENTITIES),
                 },
             )
             bridge.add_accessory(accessory)

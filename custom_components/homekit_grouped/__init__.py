@@ -38,6 +38,7 @@ from .const import (
     CONF_BRIDGE_PORT,
     CONF_CATEGORY,
     CONF_DEVICE_ID,
+    CONF_ENTITIES,
     CONF_DEVICES,
     CONF_FILTER_CHANGE_SENSOR,
     CONF_FILTER_CHANGE_THRESHOLD,
@@ -93,6 +94,7 @@ _DEVICE_SCHEMA = vol.Schema(
         vol.Optional(CONF_FILTER_CHANGE_THRESHOLD): vol.All(
             vol.Coerce(int), vol.Range(min=1, max=99)
         ),
+        vol.Optional(CONF_ENTITIES): vol.Schema({cv.string: cv.entity_id}),
     }
 )
 

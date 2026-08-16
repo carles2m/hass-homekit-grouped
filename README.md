@@ -126,9 +126,29 @@ homekit_grouped:
       name: "Cooktop"
       # category: faucet            # (optional, default faucet)
       # valve_type: irrigation      # (optional, default irrigation)
+      # entities:                   # (optional) explicit entity_id overrides
+      #   kitchen_timer: number.cooktop_kitchen_timer
+      #   kitchen_timer_alarm: binary_sensor.cooktop_kitchen_timer_alarm
 ```
 
 ### Per-device options
+
+- **`entities`** — map of role name → `entity_id`, overriding discovery for that
+  role. Profiles normally find their entities by scanning the HA device, which
+  only returns entities *attached* to it. Use an override when an entity the
+  accessory needs lives outside the device — for example one supplied by a
+  helper integration whose platform has no config entry, since HA ignores
+  `device_info` for those and never attaches them. Roles not listed still fall
+  back to the device scan. An override naming a non-existent entity logs a
+  distinct warning rather than the generic "missing entity" one.
+
+  Overrides are explicit on purpose: a registry-wide suffix search would be
+  simpler, but several GE appliances expose identically-suffixed entities
+  (ovens also have `_kitchen_timer` numbers), so it could silently bind an
+  accessory to the wrong appliance.
+
+  `ge_cooktop` roles: `kitchen_timer`, `cooktop_on`, `kitchen_timer_alarm`,
+  `locked`.
 
 - **`category`** — affects the Apple Home tile icon. Valid across profiles:
   `sprinkler`, `faucet`, `fan`, `other`, `shower_head`, `door`, `sensor`, `window`.

@@ -216,21 +216,69 @@ class GeCooktopAccessory(GroupedAccessory):
         self.set_primary_service(serv_valve)
 
     def _resolve_entities(self) -> None:
+        # Explicit config overrides win; the device scan below fills in the
+        # rest. Needed because async_entries_for_device only returns entities
+        # attached to the HA device, and some of a cooktop's entities come
+        # from a helper integration whose platform has no config entry — HA
+        # ignores device_info for those, so they are never attached.
+        #
+        # Deliberately NOT a registry-wide suffix search: ovens expose
+        # identically-suffixed `_kitchen_timer` numbers, so a global match
+        # could silently bind this accessory to the wrong appliance.
+        overrides = self.overrides.get("entities") or {}
+        self._timer_entity = overrides.get("kitchen_timer")
+        self._cooktop_on_entity = overrides.get("cooktop_on")
+        self._alarm_entity = overrides.get("kitchen_timer_alarm")
+        self._lock_entity = overrides.get("locked")
+
         registry = er.async_get(self.hass)
         for entry in er.async_entries_for_device(registry, self.device_id):
             eid = entry.entity_id
-            if eid.startswith("number.") and eid.endswith("_kitchen_timer"):
+            if (
+                self._timer_entity is None
+                and eid.startswith("number.")
+                and eid.endswith("_kitchen_timer")
+            ):
                 self._timer_entity = eid
-            elif eid.startswith("binary_sensor.") and eid.endswith(
-                "_cooktop_on"
+            elif (
+                self._cooktop_on_entity is None
+                and eid.startswith("binary_sensor.")
+                and eid.endswith("_cooktop_on")
             ):
                 self._cooktop_on_entity = eid
-            elif eid.startswith("binary_sensor.") and eid.endswith(
-                "_kitchen_timer_alarm"
+            elif (
+                self._alarm_entity is None
+                and eid.startswith("binary_sensor.")
+                and eid.endswith("_kitchen_timer_alarm")
             ):
                 self._alarm_entity = eid
-            elif eid.startswith("binary_sensor.") and eid.endswith("_locked"):
+            elif (
+                self._lock_entity is None
+                and eid.startswith("binary_sensor.")
+                and eid.endswith("_locked")
+            ):
                 self._lock_entity = eid
+
+        # An override naming an entity that does not exist is a config error,
+        # not a discovery miss — say so distinctly, because the generic
+        # "missing … entity" warning below would send you hunting the device.
+        for label, eid in (
+            ("kitchen_timer", self._timer_entity),
+            ("cooktop_on", self._cooktop_on_entity),
+            ("kitchen_timer_alarm", self._alarm_entity),
+            ("locked", self._lock_entity),
+        ):
+            if (
+                label in overrides
+                and eid is not None
+                and self.hass.states.get(eid) is None
+            ):
+                _LOGGER.warning(
+                    "%s: configured %s override %s does not exist",
+                    self.display_name,
+                    label,
+                    eid,
+                )
 
         for label, eid in (
             ("kitchen_timer", self._timer_entity),
