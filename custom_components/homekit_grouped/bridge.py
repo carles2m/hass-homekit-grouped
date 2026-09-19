@@ -3,7 +3,7 @@
 Runs a pyhap AccessoryDriver inside HA's event loop, on a dedicated port,
 with persistent pairing state stored in the HA config directory.
 
-Uses HA's shared Zeroconf instance. All pyhap setup that does synchronous
+Uses HA's shared AsyncZeroconf instance. All pyhap setup that does synchronous
 filesystem I/O (resource loads, pairing state read) runs in an executor
 so the event loop stays responsive during startup.
 """
@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Any
 
-from homeassistant.components.zeroconf import async_get_instance
+from homeassistant.components.zeroconf import async_get_async_instance
 from homeassistant.core import HomeAssistant
 from pyhap.accessory import Bridge
 from pyhap.accessory_driver import AccessoryDriver
@@ -131,7 +131,9 @@ class GroupedBridge:
             len(self.device_configs),
         )
 
-        zeroconf = await async_get_instance(self.hass)
+        # The async wrapper, as core homekit uses: pyhap calls async_close() on
+        # stop, which HaAsyncZeroconf no-ops and plain HaZeroconf lacks.
+        zeroconf = await async_get_async_instance(self.hass)
         self._driver = await self.hass.async_add_executor_job(
             self._build_driver_and_bridge, zeroconf
         )
