@@ -21,6 +21,7 @@ CONF_LIGHT = "light"
 CONF_AMBIENT_LIGHT_SENSOR = "ambient_light_sensor"
 CONF_FILTER_CHANGE_SENSOR = "filter_change_sensor"
 CONF_FILTER_CHANGE_THRESHOLD = "filter_change_threshold"
+CONF_LOCKOUT_SWITCH = "lockout_switch"
 # Explicit entity_id overrides, keyed by the profile's own role name
 # (e.g. kitchen_timer, kitchen_timer_alarm). Profiles normally discover
 # their entities by scanning the HA device, which only finds entities

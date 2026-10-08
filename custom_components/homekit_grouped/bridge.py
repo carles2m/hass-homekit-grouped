@@ -31,6 +31,7 @@ from .const import (
     CONF_FINISHED_EVENT_TYPES,
     CONF_HOT_WATER_LOW_THRESHOLD,
     CONF_LIGHT,
+    CONF_LOCKOUT_SWITCH,
     CONF_NAME,
     CONF_NIGHT_MODE_SWITCH,
     CONF_NO_HOT_WATER_SENSOR,
@@ -107,6 +108,7 @@ class GroupedBridge:
                     "filter_change_threshold": cfg.get(
                         CONF_FILTER_CHANGE_THRESHOLD
                     ),
+                    "lockout_switch": cfg.get(CONF_LOCKOUT_SWITCH),
                     "entities": cfg.get(CONF_ENTITIES),
                 },
             )

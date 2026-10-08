@@ -18,7 +18,8 @@ Services exposed:
         Apple Home actually shows is the Switch below.
   - Lightbulb:   the opener's light
   - MotionSensor: the opener's motion detector
-  - Switch:      the opener's remote lockout (what Apple Home renders)
+  - Switch:      the opener's remote lockout — OPT-IN (`lockout_switch`),
+                 and the only form of the lockout Apple Home will draw
 
 Each service is created only if the matching entity exists on the
 device, so a trimmed-down firmware build doesn't get dead services.
@@ -122,12 +123,15 @@ class KonnectedGdoAccessory(GroupedAccessory):
                 f"{self.display_name} Motion"
             )
 
-        # --- Switch: the remote lockout -------------------------------------
-        # Appended LAST: this accessory is already paired, and pyhap assigns
-        # IIDs in order of addition, so anything inserted earlier would shift
-        # every later IID and risk Apple Home's schema cache.
+        # --- Switch: the remote lockout (opt-in) ----------------------------
+        # Off by default: a lockout toggle is clutter in Apple Home for most
+        # people, and the door, light and motion are the useful controls.
+        # Appended LAST, so turning it on adds trailing IIDs and turning it
+        # off removes them — pyhap assigns IIDs in order of addition, so
+        # anything inserted earlier would shift every later IID and risk
+        # Apple Home's schema cache.
         self._char_lockout_on = None
-        if self._lock_entity:
+        if self._lock_entity and self.overrides.get("lockout_switch"):
             self._char_lockout_on = self._add_lockout_switch(
                 f"{self.display_name} Remote Lockout"
             )

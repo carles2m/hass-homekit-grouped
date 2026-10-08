@@ -52,14 +52,17 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
 - **Konnected GDO blaQ garage door opener** (`konnected_gdo` profile, via its
   own ESPHome firmware) — GarageDoorOpener as the primary service, with the
   safety beam on `ObstructionDetected`. Linked services: a Lightbulb for the
-  opener's light, a MotionSensor for its motion detector, and a Switch for the
-  opener's remote lockout (on = remotes locked out). Each is created only if
-  the matching entity exists on the device. The lockout is also published on
-  the garage service's own `LockCurrentState` / `LockTargetState`, which HAP
-  lists as optional characteristics of GarageDoorOpener — but **Apple Home
-  does not render those**, verified 2026-10-07, hence the Switch. A
-  LockMechanism was avoided deliberately: this lockout only disables the RF
-  remotes, so a deadbolt-looking, authenticated control would misdescribe it. Also fits
+  opener's light, a MotionSensor for its motion detector, and an opt-in Switch
+  for the opener's remote lockout (on = remotes locked out). Each is created
+  only if the matching entity exists on the device. The lockout is always
+  published on the garage service's own `LockCurrentState` /
+  `LockTargetState`, which HAP lists as optional characteristics of
+  GarageDoorOpener — but **Apple Home does not render those** (verified
+  2026-10-07), so the Switch is the only way to see it there, and it is off by
+  default because a lockout toggle is clutter next to the door, light and
+  motion. A LockMechanism was avoided deliberately: this lockout only disables
+  the RF remotes, so a deadbolt-looking, authenticated control would
+  misdescribe it. Also fits
   an esphome-ratgdo board whose entity names match the same suffixes. Worth
   having even for the door alone: the firmware's cover carries no
   `device_class`, so HA's built-in bridge publishes it as a window shade, which
@@ -149,6 +152,8 @@ homekit_grouped:
     - profile: konnected_gdo
       device_id: <ha_device_id_of_gdo_blaq>
       name: "Garage Door"
+      # lockout_switch: true       # (optional, default false) Switch for the
+                                   # opener's remote lockout
 ```
 
 ### Per-device options
