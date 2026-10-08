@@ -5,6 +5,7 @@ from .coway_air_purifier import CowayAirPurifierAccessory
 from .econet_water_heater import EcoNetWaterHeaterAccessory
 from .ge_cooktop import GeCooktopAccessory
 from .home_connect_fridge import HomeConnectFridgeAccessory
+from .konnected_gdo import KonnectedGdoAccessory
 from .thinq_washer import ThinqWasherAccessory
 
 PROFILES: dict[str, type[GroupedAccessory]] = {
@@ -13,6 +14,7 @@ PROFILES: dict[str, type[GroupedAccessory]] = {
     "econet_water_heater": EcoNetWaterHeaterAccessory,
     "coway_air_purifier": CowayAirPurifierAccessory,
     "ge_cooktop": GeCooktopAccessory,
+    "konnected_gdo": KonnectedGdoAccessory,
 }
 
 

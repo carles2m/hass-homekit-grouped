@@ -49,6 +49,19 @@ Alpha. Use at your own risk. Tested with a specific setup; YMMV.
   be unlocked from third-party clients per Brillion's per-client
   writability policy).
 
+- **Konnected GDO blaQ garage door opener** (`konnected_gdo` profile, via its
+  own ESPHome firmware) — GarageDoorOpener as the primary service, with the
+  safety beam on `ObstructionDetected` and the opener's remote lockout on the
+  garage service's own `LockCurrentState` / `LockTargetState` (HAP lists them
+  as optional characteristics of GarageDoorOpener, so the lockout rides on the
+  door instead of becoming a second deadbolt-looking tile). Linked services: a
+  Lightbulb for the opener's light and a MotionSensor for its motion detector.
+  Each is created only if the matching entity exists on the device. Also fits
+  an esphome-ratgdo board whose entity names match the same suffixes. Worth
+  having even for the door alone: the firmware's cover carries no
+  `device_class`, so HA's built-in bridge publishes it as a window shade, which
+  costs you the garage tile and the CarPlay garage button.
+
 More profiles to come. PRs welcome (but don't expect fast merges).
 
 ## How it works
@@ -129,6 +142,10 @@ homekit_grouped:
       # entities:                   # (optional) explicit entity_id overrides
       #   kitchen_timer: number.cooktop_kitchen_timer
       #   kitchen_timer_alarm: binary_sensor.cooktop_kitchen_timer_alarm
+    # Konnected GDO blaQ garage door opener (ESPHome firmware)
+    - profile: konnected_gdo
+      device_id: <ha_device_id_of_gdo_blaq>
+      name: "Garage Door"
 ```
 
 ### Per-device options
