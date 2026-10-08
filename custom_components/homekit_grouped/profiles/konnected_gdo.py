@@ -9,12 +9,16 @@ window shade rather than a garage door.
 Services exposed:
   - GarageDoorOpener: the door (PRIMARY)
       * ObstructionDetected mirrors the opener's safety-beam sensor
-      * LockCurrentState / LockTargetState are the opener's remote
+      * LockCurrentState / LockTargetState carry the opener's remote
         lockout. HAP lists them as optional characteristics OF the
-        garage service, so the lockout rides along on the door instead
-        of becoming a second, deadbolt-looking tile.
+        garage service, but Apple Home does NOT render them (verified
+        2026-10-07 on a paired bridge: door, light and motion showed up,
+        the lock did not). They are kept because they're correct per
+        spec and other controllers may use them — the lockout that
+        Apple Home actually shows is the Switch below.
   - Lightbulb:   the opener's light
   - MotionSensor: the opener's motion detector
+  - Switch:      the opener's remote lockout (what Apple Home renders)
 
 Each service is created only if the matching entity exists on the
 device, so a trimmed-down firmware build doesn't get dead services.
@@ -39,6 +43,7 @@ _LOGGER = logging.getLogger(__name__)
 _SERV_GARAGE = "GarageDoorOpener"
 _SERV_LIGHTBULB = "Lightbulb"
 _SERV_MOTION = "MotionSensor"
+_SERV_SWITCH = "Switch"
 
 _CHAR_CURRENT_DOOR_STATE = "CurrentDoorState"
 _CHAR_TARGET_DOOR_STATE = "TargetDoorState"
@@ -117,6 +122,16 @@ class KonnectedGdoAccessory(GroupedAccessory):
                 f"{self.display_name} Motion"
             )
 
+        # --- Switch: the remote lockout -------------------------------------
+        # Appended LAST: this accessory is already paired, and pyhap assigns
+        # IIDs in order of addition, so anything inserted earlier would shift
+        # every later IID and risk Apple Home's schema cache.
+        self._char_lockout_on = None
+        if self._lock_entity:
+            self._char_lockout_on = self._add_lockout_switch(
+                f"{self.display_name} Remote Lockout"
+            )
+
         # Apple Home only renders linked sub-services when the parent is
         # flagged HAP-primary — category alone is not enough.
         if serv_garage is not None:
@@ -168,6 +183,23 @@ class KonnectedGdoAccessory(GroupedAccessory):
         )
         char = serv.configure_char(_CHAR_ON, value=False)
         char.setter_callback = self._handle_light_set
+        serv.configure_char(_CHAR_NAME, value=name)
+        serv.configure_char(_CHAR_CONFIGURED_NAME, value=name)
+        return char
+
+    def _add_lockout_switch(self, name: str):
+        """The opener's remote lockout as a plain Switch. On = locked out.
+
+        A LockMechanism would read as a deadbolt on the door, which this is
+        not — it only disables the RF remotes — and Apple Home would make it
+        an authenticated control. A Switch is also a service this repo has
+        proven renders as a sub-service.
+        """
+        serv = self.add_preload_service(
+            _SERV_SWITCH, [_CHAR_ON, _CHAR_NAME, _CHAR_CONFIGURED_NAME]
+        )
+        char = serv.configure_char(_CHAR_ON, value=False)
+        char.setter_callback = self._handle_lockout_set
         serv.configure_char(_CHAR_NAME, value=name)
         serv.configure_char(_CHAR_CONFIGURED_NAME, value=name)
         return char
@@ -269,6 +301,11 @@ class KonnectedGdoAccessory(GroupedAccessory):
             self._char_door_target.set_value(target)
 
     def _push_lock(self, source_state: str) -> None:
+        if self._char_lockout_on is not None and source_state in (
+            "locked",
+            "unlocked",
+        ):
+            self._char_lockout_on.set_value(source_state == "locked")
         if self._char_lock_current is None or self._char_lock_target is None:
             return
         if source_state == "locked":
@@ -298,9 +335,11 @@ class KonnectedGdoAccessory(GroupedAccessory):
         )
 
     def _handle_lock_set(self, value: int) -> None:
+        self._call_lock("lock" if value == _LOCK_SECURED else "unlock")
+
+    def _call_lock(self, service: str) -> None:
         if not self._lock_entity:
             return
-        service = "lock" if value == _LOCK_SECURED else "unlock"
         self.hass.async_create_task(
             self.hass.services.async_call(
                 "lock",
@@ -309,6 +348,9 @@ class KonnectedGdoAccessory(GroupedAccessory):
                 blocking=False,
             )
         )
+
+    def _handle_lockout_set(self, value: int) -> None:
+        self._call_lock("lock" if value else "unlock")
 
     def _handle_light_set(self, value: int) -> None:
         if not self._light_entity:
